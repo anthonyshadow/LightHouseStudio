@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 
-import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ProjectCurrentResponse, ProjectSessionProposalContract } from '@studio/contracts';
 import { projectMediaReferenceKey, type Composition } from '@studio/domain';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { StudioDesignProvider } from '../../ui';
-import type { ProjectClipMedia } from '../projects/projectClipMedia';
+import type { ProjectClipMedia, ProjectClipMediaEntry } from '../projects/projectClipMedia';
 import type { ProjectSessionPort } from '../projects/useProjectSession';
 import { CompositionSurface } from './CompositionSurface';
 import type * as RenderCompositionModule from './renderComposition';
@@ -126,12 +126,12 @@ const composition = (): Composition => ({
   subtitles: [],
 });
 
-const media = new Map<string, ProjectClipMedia>([
-  [projectMediaReferenceKey({ kind: 'asset', assetId }), clipMedia('opening.mp4', 12_000)],
-  [
-    projectMediaReferenceKey({ kind: 'asset', assetId: otherAssetId }),
-    clipMedia('closing.mp4', 9_000),
-  ],
+/** The Project's media, in the order it lists it: the two the clips stand over. */
+const entry = (reference: { kind: 'asset'; assetId: string }, held: ProjectClipMedia) =>
+  [projectMediaReferenceKey(reference), { reference, media: held }] as const;
+const media = new Map<string, ProjectClipMediaEntry>([
+  entry({ kind: 'asset', assetId }, clipMedia('opening.mp4', 12_000)),
+  entry({ kind: 'asset', assetId: otherAssetId }, clipMedia('closing.mp4', 9_000)),
 ]);
 
 const current = (
@@ -200,12 +200,15 @@ const renderSurface = (
   const presentedMedia = overrides.presentedMedia ?? null;
   const session = createSession(arrangement);
   const onClose = vi.fn();
+  const onRetryMedia = vi.fn();
   const view = render(
     <StudioDesignProvider>
       <CompositionSurface
         current={current(arrangement, presentedMedia)}
         session={session.port}
         media={media}
+        mediaStatus="ready"
+        onRetryMedia={onRetryMedia}
         archived={overrides.archived ?? false}
         onClose={onClose}
         createId={() => clipId(9)}
@@ -220,6 +223,8 @@ const renderSurface = (
           current={current(session.staged() ?? arrangement, presentedMedia)}
           session={session.port}
           media={media}
+          mediaStatus="ready"
+          onRetryMedia={onRetryMedia}
           archived={overrides.archived ?? false}
           onClose={onClose}
           createId={() => clipId(9)}
@@ -321,6 +326,149 @@ describe('CompositionSurface', () => {
     expect(screen.getByText(/no longer arranged/u)).toBeInTheDocument();
   });
 
+  it('adds one of the Project’s videos as the last clip, selects it, and says so', async () => {
+    const { session } = renderSurface();
+    fireEvent.click(clipOptions()[0]!);
+    fireEvent.click(screen.getByRole('button', { name: 'Add a clip' }));
+
+    const dialog = screen.getByRole('dialog', { name: 'Add a clip' });
+    // Every video the Project holds, in its order, with what the render's policy will read from it.
+    const rows = within(
+      within(dialog).getByRole('list', { name: 'Videos in this Project' }),
+    ).getAllByRole('button');
+    expect(rows[0]).toHaveTextContent(/^opening\.mp4/u);
+    expect(rows[0]).toHaveTextContent('1920×1080 · 00:12.00 · with sound');
+    expect(rows[0]).toHaveTextContent('Already in this arrangement as 1 clip.');
+    expect(rows[1]).toHaveTextContent(/^closing\.mp4/u);
+
+    fireEvent.click(rows[1]!);
+    // The panel leaves after its exit transition; the surface behind it is inert until it has, so
+    // nothing is said there yet — a live region written under `aria-hidden` is written to no one.
+    expect(screen.queryByText(/^Added “closing\.mp4”/u)).toBeNull();
+    // A second press while the panel is still leaving is not a second clip.
+    expect(rows[1]).toBeDisabled();
+    fireEvent.click(rows[1]!);
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+    // The whole of the video, at the end, with the id the surface minted; the selection moves to
+    // it and the playhead to where it starts.
+    const clips = session.staged()?.clips ?? [];
+    expect(clips.map(({ id }) => id)).toEqual([clipId(1), clipId(2), clipId(9)]);
+    expect(clips[2]).toEqual({
+      id: clipId(9),
+      media: { kind: 'asset', assetId: otherAssetId },
+      trim: { startMs: 0, endMs: 9_000 },
+      audio: { level: 100, muted: false },
+    });
+    expect(clipOptions()).toHaveLength(3);
+    expect(clipOptions()[2]).toHaveAttribute('aria-selected', 'true');
+    expect(clipOptions()[2]).toHaveTextContent('Clip 3 of 3');
+    expect(screen.getByRole('slider', { name: 'Playhead' })).toHaveValue('6500');
+    // Said once the panel has gone, in a live region — `status` — where it can be heard.
+    const said = await screen.findByText('Added “closing.mp4” as clip 3 of 3.');
+    expect(said.closest('[role="status"]')).not.toBeNull();
+    // The playhead sits on the new clip's own cut, so a split is refused there until it moves —
+    // the same state choosing a clip from the strip leaves.
+    expect(screen.getByRole('button', { name: 'Split at playhead' })).toBeDisabled();
+    expect(screen.getByText(/already on a cut/u)).toBeVisible();
+    // Focus lands on the clip that was added, which is now the strip's one tab stop.
+    await waitFor(() => expect(clipOptions()[2]).toHaveFocus());
+  });
+
+  it('announces the same words twice when the same thing happens twice', () => {
+    const three: Composition = {
+      ...composition(),
+      clips: [...composition().clips, { ...composition().clips[0]!, id: clipId(3) }],
+    };
+    renderSurface(three);
+    fireEvent.click(clipOptions()[0]!);
+    fireEvent.click(screen.getByRole('button', { name: 'Remove this clip' }));
+    const first = screen.getByText('Clip removed from the arrangement.');
+    fireEvent.click(clipOptions()[0]!);
+    fireEvent.click(screen.getByRole('button', { name: 'Remove this clip' }));
+    // The same sentence, but a new node: a live region that keeps the same text node says nothing
+    // the second time, and React would not have touched it.
+    const second = screen.getByText('Clip removed from the arrangement.');
+    expect(second).not.toBe(first);
+    expect(first).not.toBeInTheDocument();
+    expect(clipOptions()).toHaveLength(1);
+  });
+
+  it('puts focus on the added clip even when that add fills the arrangement and disables the control', async () => {
+    // Ids the surface's own minter (clip 9) does not collide with.
+    const nearlyFull: Composition = {
+      ...composition(),
+      clips: Array.from({ length: 99 }, (_, index) => ({
+        ...composition().clips[0]!,
+        id: clipId(index + 100),
+      })),
+    };
+    renderSurface(nearlyFull);
+    const add = screen.getByRole('button', { name: 'Add a clip' });
+    add.focus();
+    fireEvent.click(add);
+    fireEvent.click(screen.getByRole('button', { name: /^closing\.mp4/u }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(clipOptions()).toHaveLength(100);
+    expect(add).toBeDisabled();
+    await waitFor(() => expect(clipOptions()[99]).toHaveFocus());
+  });
+
+  it('says so when the session will not stage the add, since the Project route is hidden', async () => {
+    const { session } = renderSurface();
+    session.propose.mockReturnValueOnce(false);
+    fireEvent.click(screen.getByRole('button', { name: 'Add a clip' }));
+    fireEvent.click(screen.getByRole('button', { name: /^closing\.mp4/u }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'That video could not be added. Your arrangement is unchanged.',
+    );
+    // And said aloud once the panel has gone, since the alert was raised while the page was inert.
+    await waitFor(() =>
+      expect(
+        screen
+          .getAllByText('That video could not be added. Your arrangement is unchanged.')
+          .filter((node) => node.closest('[role="status"]') !== null),
+      ).toHaveLength(1),
+    );
+    expect(clipOptions()).toHaveLength(2);
+    // The next attempt starts clean.
+    fireEvent.click(screen.getByRole('button', { name: 'Add a clip' }));
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('refuses to add to a full arrangement, with one reason that the split shares', () => {
+    const full: Composition = {
+      ...composition(),
+      clips: Array.from({ length: 100 }, (_, index) => ({
+        ...composition().clips[0]!,
+        id: clipId(index + 1),
+      })),
+    };
+    renderSurface(full);
+    const add = screen.getByRole('button', { name: 'Add a clip' });
+    expect(add).toBeDisabled();
+    expect(add).toHaveAttribute('aria-describedby', 'composition-full-reason');
+    const split = screen.getByRole('button', { name: 'Split at playhead' });
+    expect(split).toBeDisabled();
+    expect(split).toHaveAttribute('aria-describedby', 'composition-full-reason');
+    // Once, not once per control.
+    expect(screen.getAllByText(/holds as many clips as it can/u)).toHaveLength(1);
+    expect(screen.queryByText(/Cannot split here/u)).toBeNull();
+  });
+
+  it('closes the picker without adding, and hands focus back to the control that opened it', async () => {
+    const { session } = renderSurface();
+    const add = screen.getByRole('button', { name: 'Add a clip' });
+    add.focus();
+    fireEvent.click(add);
+    expect(screen.getByRole('dialog', { name: 'Add a clip' })).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(session.propose).not.toHaveBeenCalled();
+    await waitFor(() => expect(add).toHaveFocus());
+  });
+
   it('says so when a clip stands over media this Project can no longer open', () => {
     const orphaned: Composition = {
       ...composition(),
@@ -347,7 +495,7 @@ describe('CompositionSurface', () => {
     renderSurface(composition(), { archived: true });
     fireEvent.click(clipOptions()[0]!);
     expect(screen.getByText(/This Project is archived/u)).toBeVisible();
-    for (const name of ['Remove this clip', 'Move later', 'Mute this clip']) {
+    for (const name of ['Remove this clip', 'Move later', 'Mute this clip', 'Add a clip']) {
       expect(screen.getByRole('button', { name })).toBeDisabled();
     }
   });
@@ -437,7 +585,13 @@ describe('CompositionSurface', () => {
     expect(screen.getByText(/Rendering at 1920×1080, sound at 48 kHz stereo/u)).toBeVisible();
     // Nothing may change the arrangement underneath a render.
     fireEvent.click(clipOptions()[0]!);
-    for (const name of ['Split at playhead', 'Undo', 'Remove this clip', 'Mute this clip']) {
+    for (const name of [
+      'Split at playhead',
+      'Add a clip',
+      'Undo',
+      'Remove this clip',
+      'Mute this clip',
+    ]) {
       expect(screen.getByRole('button', { name })).toBeDisabled();
     }
     expect(screen.getByRole('slider', { name: 'Clip volume' })).toBeDisabled();

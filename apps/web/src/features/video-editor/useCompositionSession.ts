@@ -1,6 +1,9 @@
 import type { ProjectCurrentResponse } from '@studio/contracts';
 import {
   VIDEO_EDIT_HISTORY_LIMIT,
+  appendClip,
+  clipOverMedia,
+  compositionIsFull,
   compositionOverMedia,
   compositionPlacements,
   compositionSplitRefusal,
@@ -165,6 +168,28 @@ export const useCompositionSession = (
     [composition, createId, stage],
   );
 
+  /**
+   * Adds one of the Project's videos as the last clip, the whole of it, and selects it. Answers
+   * the new clip's id, or `null` when the add was refused, so the surface can put focus on it.
+   *
+   * At the end rather than after the selection or at the playhead: the strip is an ordered list
+   * and the operator already has two ways to move a clip once it is there, where an insertion
+   * point the surface had to explain would be a third idea for the same gesture. The playhead
+   * moves to the new clip's start — where the sequence ended a moment ago — so the still and the
+   * selection agree, as they do when a clip is chosen from the strip.
+   */
+  const add = useCallback(
+    (media: ProjectMediaReference, mediaDurationMs: number): string | null => {
+      const id = createId();
+      const startsAtMs = durationMs;
+      if (!edit((held) => appendClip(held, clipOverMedia(media, mediaDurationMs, id)))) return null;
+      setSelectedClipId(id);
+      setPlayheadMs(startsAtMs);
+      return id;
+    },
+    [createId, durationMs, edit],
+  );
+
   const move = useCallback(
     (clipId: string, toIndex: number) => edit((held) => moveClip(held, clipId, toIndex)),
     [edit],
@@ -234,6 +259,10 @@ export const useCompositionSession = (
     splitRefusal,
     split,
     arrange,
+    add,
+    // Asked before the add is offered, the way the split's refusal is: a full arrangement gets a
+    // disabled control with its reason, not a press that fails.
+    atLimit: composition !== null && compositionIsFull(composition),
     beginGesture,
     endGesture,
     move,

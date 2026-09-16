@@ -323,7 +323,7 @@ interpretation" and recorded with the alternative refused.
 Moves to **4.3**: composition-aware save, "Use as the current cut" for a stitched render (the adopt
 path's only provenance field is `localEdit`, which would misdescribe the bytes), and export
 placements over the arrangement — the render function returns a Blob and a plan that 4.3 can use
-as they are. Deferred with the reason: the add-clip control (§5.5); a gain option inside the
+as they are. Deferred with the reason: the add-clip control (§5.5 — closed the same day, §8.6); a gain option inside the
 conformer (one copy saved per attenuated sample; the helper is enough for now); packet passthrough
 (unsafe across sources); a chunk rule for the domain barrel edge (a build-config change, per the
 ledger); a frame cap; live scrubbing across cuts as a non-authoritative aid; the two pre-existing
@@ -395,11 +395,11 @@ API on a spare port with every provider unconfigured, and a Vite instance proxie
 Apple M1 Pro (16 GiB, macOS Darwin 25.6.0), Playwright 1.62.1's bundled Chromium, software H.264
 (`prefer-software`), `Quality('high')`, 2026-09-15:
 
-| Journey                                                                                                                                                            | Measured                                                                                                                       |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
-| `e2e/stitched-render.spec.ts` — 1280×720, 1080×1920 at 6 fps, 320×180 with AAC, one cue across the first cut, into one 1080×1920 file                              | **457 ms for 2.20 s of output (208 ms per output second)**; 49,805 bytes; 14 progress reports. Four runs measured 427–504 ms.  |
-| `e2e/real-stack-project-deliverable.spec.ts` — the surface's own path: a one-second portrait source uploaded, arranged, split, rendered at 1080×1920 and validated | upload source 4.1 s, arrange and split 2.0 s, **stitched render 1.0 s** (worker and validation), read back 0.1 s; total 7.2 s. |
-| The same spec's cancel case — abort on the first progress report                                                                                                   | settles as a cancel within the client's two-second grace; measured well under it.                                              |
+| Journey                                                                                                                                                                                                                                                    | Measured                                                                                                                       |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `e2e/stitched-render.spec.ts` — 1280×720, 1080×1920 at 6 fps, 320×180 with AAC, one cue across the first cut, into one 1080×1920 file                                                                                                                      | **457 ms for 2.20 s of output (208 ms per output second)**; 49,805 bytes; 14 progress reports. Four runs measured 427–504 ms.  |
+| `e2e/real-stack-project-deliverable.spec.ts` — the surface's own path as it stood before §8.6: a one-second portrait source uploaded, arranged, split, rendered at 1080×1920 and validated (the journey now adds a second video; §8.6 carries its timings) | upload source 4.1 s, arrange and split 2.0 s, **stitched render 1.0 s** (worker and validation), read back 0.1 s; total 7.2 s. |
+| The same spec's cancel case — abort on the first progress report                                                                                                                                                                                           | settles as a cancel within the client's two-second grace; measured well under it.                                              |
 
 At a fifth of a second per output second for a 1080×1920 mixed arrangement, `Quality('high')`
 stays (§5.9): the preview is affordable, and 4.3 can save the same bytes the operator watched. The
@@ -474,7 +474,127 @@ where the save is decided.
 ### 8.5 Deliberately not done
 
 Everything §6 names, unchanged: composition-aware save and adoption (4.3); the add-clip control
-(§5.5 — the first thing to do before prompt 35); a conformer gain option; packet passthrough; the
-barrel chunk rule; a frame cap; live scrubbing. `bun run check:dead-code:production` now reports
-only the two pre-existing `apps/api` test-support files; the conformer finding it carried since the
-mixed-audio slice is cleared by the worker's import.
+(§5.5 — the first thing to do before prompt 35, and done the same day, §8.6); a conformer gain
+option; packet passthrough; the barrel chunk rule; a frame cap; live scrubbing.
+`bun run check:dead-code:production` reported only the two pre-existing `apps/api` test-support
+files; the conformer finding it carried since the mixed-audio slice is cleared by the worker's
+import, and the two files are dealt with in §8.6.
+
+### 8.6 Follow-up the same day: the add-clip control
+
+Built on 2026-09-15, on the operator's instruction to do what §8.5 left, and reviewed the same way
+(§8.4's shape: independent lenses over the design against the code, then over the diff).
+
+**What it is.** **Add a clip** sits in the arrangement editor's gesture row beside **Split at
+playhead**. It opens a panel — the `OverlayPanel` the Media area's saved-video picker already
+uses, placed at the bottom, wide, scrolling — listing every entry in the clip-media catalogue: the
+Project's sources in the collection's order and the cut the revision presents, each with its frame,
+its length, whether it carries sound, and how many clips already stand over it. Choosing one
+appends the whole of it as the last clip, selects it, moves the playhead to its start — where the
+sequence ended a moment ago, so the still and the selection agree — closes the panel, puts focus
+on the new clip and announces the add. A full arrangement refuses the split and the add with one
+notice, which both controls describe themselves by. Archived and rendering states disable it with
+every other gesture. While the Project's media is still being read the panel says "Loading
+videos…" rather than "nothing to add". The render, the stale marker and the per-clip notices are
+untouched: the request already carried each clip's media in sequence order, and the loop already
+opened one input at a time and read metadata once per URL.
+
+**Decided here.**
+
+- **At the end, always** — not after the selection and not at the playhead. The strip is an
+  ordered list with two reorder gestures already, the domain's verbs are append, remove and move
+  (the 4.1 plan built `appendClip` deliberately, and there is no insert-at-index), and no product
+  document names an insertion point; an insertion the surface had to explain would be a third idea
+  for one gesture, and an at-playhead insert would be a split as well.
+- **`clipOverMedia(media, durationMs, id)` takes the id rather than a minter.** The surface selects
+  the clip it just added, which it can only do with the id it minted — the same reason
+  `createSubtitleCueAt` takes an id. It is checked at mint, as the split checks its own, so a clip
+  from the factory is storable before anything appends it. `compositionOverMedia` keeps its
+  `createId` signature and is now one clip from the same factory.
+- **`compositionIsFull` is the one predicate** behind `appendClip`'s guard and the split's
+  `at-limit`, in `operations.ts` rather than `rules.ts`: the validator's question is "may a hundred
+  be stored" (yes), the editor's is "is there room for one more" (no).
+- **The catalogue carries each entry's reference beside its media** (`ProjectClipMediaEntry`), in
+  the order the Project lists it. A clip is added by reference and shown by URL, and a catalogue
+  that kept only the media would have had the surface parsing its own keys back into references.
+- **No preview in the panel.** The Media area previews the same media a step away, and a player per
+  row would hold a ranged request per open row on a surface that already has the stage. Rows are
+  named by their content, as the saved-video picker's are, so a screen reader hears the frame, the
+  length and the sound it is choosing between; the panel's title carries the verb. The length is
+  written the way the strip writes a clip (`00:12.00`), not the way the Media area lists a file.
+  The row's copy treatment is now `videoRowCopyStyles` in `projectVideoRow.styles.ts`, which the
+  saved-video picker reads too in place of the private copy it was lifted from; the Media area's
+  own copy differs (it carries a state badge) and was left alone.
+- **Focus goes to the clip that was added, not back to the control.** The panel resolves its
+  return target when it has closed, so the surface hands it an object whose `current` is the new
+  tile when there is one and the control otherwise. Without that, the one add that fills the
+  arrangement — after which the control is disabled — would have dropped focus on the page.
+- **The surface's live region never was one.** `VisuallyHidden` takes a `role` and drops any other
+  attribute, so the `aria-live` written on it in 4.1 announced nothing: not a reorder, not a
+  removal, not the render starting. It is `role="status"` now, and the text is remounted on every
+  announcement so the same words twice are heard twice. Making it live also made two sentences
+  double up with elements that were already speaking — the progress region says the render has
+  started, and the failure notice is an alert — so the region now says only that the render is
+  ready. And the add's own sentence is held until the panel has gone: while a panel is closing the
+  page behind it is still `inert` and `aria-hidden`, so `OverlayPanel` gained `onExited`, called
+  once its isolation is lifted and focus is back, and that is when the add is said.
+- **One choice per opening.** The panel stays on screen, and pressable, through its exit
+  transition, so a double-click on a row was two clips — and at the limit, a first add that landed
+  followed by a refusal that said the arrangement was unchanged. The rows are disabled the moment
+  the panel is told to close, which is the picker's own fact to hold; `OverlayPanel` now says in
+  its own words that it stays interactive while exiting, so the next caller need not rediscover it.
+- **A failed read says so.** The catalogue reports `loading`, `failed` or `ready`, with a retry
+  that asks again for whichever read failed; the panel shows the failure with **Retry** rather
+  than "nothing to add" about a Project whose videos it could not list.
+- **The shape notice stays post-render.** Saying "this clip will get bars" before the render would
+  need `compositionVideoTarget` on the surface, which pulls `composition/video.ts` through the
+  barrel edge (§1.6) into the chunk both closures share; the render's own plan says it a moment
+  later, for the actual frame.
+- **After an add the playhead sits on the new clip's own cut**, so **Split at playhead** reads
+  "already on a cut" until it moves — the same state choosing a clip from the strip leaves, and
+  the test says so. An add the session will not stage is said on the surface, in a notice and in
+  the live region, because the session's own message goes to the Project route, which the
+  arrangement hides while it has the stage.
+- **A failed or cancelled render no longer leaves its plan on show.** A pre-existing gap the
+  review found reachable through the add: the header kept "renders at W×H" from a render that
+  had posted its plan and then failed, and a later move would have read the per-clip notices
+  against the wrong clips. The hook now clears the plan on both paths, as `discard` already did.
+- **Adding from the cut the Project works from is offered on purpose.** It is the media the first
+  clip is seeded over, and a Project that adopted a result may want it twice. One consequence,
+  recorded rather than changed: a processing result the arrangement uses as a clip reads as
+  **current** in the processing panel until the clip is removed, because held media includes every
+  clip's reference (`projectHeldMediaByRole`). An adoption an earlier revision made is still not
+  addressable — `GET /working-media` takes no revision — so it is not in the catalogue and not
+  offered; the caveat in `composition/types.ts` stands.
+
+**Measured.** After the change, the shell closure is 748_964 of 749_000 (from 748_788: the two
+domain additions land in the shared chunk, as §1.6 predicts, and `OverlayPanel`'s new `onExited`
+is in the shell by definition — 176 bytes between them) and the Studio closure 1_100_347 of
+1_101_000 (from 1_100_130); the panel and its rows are in the lazy arrangement chunk. Neither
+ceiling moved, and the shell's headroom is now 36 bytes: the next domain addition that reaches the
+barrel, or the next byte a shared primitive needs, will need the chunk rule §1.6 describes or a
+ledger entry. The real-stack journey now uploads a 1280×720 second video beside the portrait
+original, splits the original, adds the second through the control, renders the three clips and
+reads the file back: 1080×1920 with no bar in the portrait half it samples and a >98% black top
+band inside the third clip; the inspector says "Shown with bars" for it. On the isolated stack
+(the §8.1 machine): upload two sources 3.6 s, arrange, split and add 1.8 s, stitched render
+1.0 s, read back 0.1 s, 6.5 s in all.
+
+**Left for later, deliberately.** `VisuallyHidden` still drops every prop but `role`, so
+`aria-live` on it is a silent no-op that the type checker does not catch — two other surfaces work
+around it by nesting their own `span`. Widening the primitive is additive and small, but it is a
+shared-primitive change with no caller in this slice that needs it. The same goes for making
+`OverlayPanel` inert while it exits, which would remove the need for a picker to disable its own
+rows but reaches every one of its callers; the docblock now states the trap instead.
+
+**Tests.** Domain: the factory (whole of the media, the floor, the id check, appended it
+validates) and the predicate. `projectClipMedia.test.ts`: order, the presented cut overriding a
+held source in place and appended when not held, the borrowed-Version key, the null answer.
+Surface: add → last, selected, playhead moved, announced, panel gone, focus returned; the full
+arrangement's refusal; Escape closes without a proposal; disabled while archived and while
+rendering. The real-stack third journey as above.
+
+**Also done.** `knip.json`'s `apps/api` project now excludes `src/**/*.test-support.ts` from the
+production analysis (`!src/**/*.test-support.ts!`), the way it already excludes `src/test/**`: the
+two files are reached only from tests, which production mode does not start from.
+`bun run check:dead-code:production` and `bun run check:dead-code` both exit 0.

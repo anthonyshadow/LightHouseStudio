@@ -32,7 +32,7 @@ export const ProjectCompositionSurface = ({
   /** Reported up so route exit, `beforeunload` and logout treat the render like the editor's. */
   readonly onRenderActivityChange?: ((activity: CompositionRenderActivity) => void) | undefined;
 }) => {
-  const media = useProjectClipMediaCatalogue(current);
+  const { media, status, retry } = useProjectClipMediaCatalogue(current);
   const projectId = current.project.id;
   const onRenderingChange = useCallback(
     (busy: boolean) => onRenderActivityChange?.({ projectId, busy }),
@@ -43,6 +43,8 @@ export const ProjectCompositionSurface = ({
       current={current}
       session={session}
       media={media}
+      mediaStatus={status}
+      onRetryMedia={retry}
       archived={archived}
       onClose={onClose}
       onRenderingChange={onRenderingChange}

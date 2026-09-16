@@ -260,9 +260,10 @@ The retained suite protects:
   login, a Project created through the running API, a source uploaded as real bytes, an on-device
   render adopted as the current cut, a save that produces a real Video, and a download served from
   where the server stored it — asserted against the server's own output history and Video record,
-  not a simulator's. A third journey there arranges an uploaded source, splits it, renders the
-  arrangement through the surface and reads the file back with the page's decoder, printing its
-  phase timings. Every other browser journey drives an in-page simulator on purpose: simulators
+  not a simulator's. A third journey there arranges an uploaded portrait source, splits it, adds
+  a 16:9 second video as the third clip through **Add a clip**, renders the mixed arrangement through
+  the surface and reads the file back with the page's decoder — the bars where the policy puts
+  them — printing its phase timings. Every other browser journey drives an in-page simulator on purpose: simulators
   are how a lost response, a never-settling provider or a mid-upload disconnect is injected, and
   they stay for that. They cannot prove the server honours its own contract, because each one _is_
   the contract restated; this journey is where that proof lives. The provider-free

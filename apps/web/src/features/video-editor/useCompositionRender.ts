@@ -107,6 +107,9 @@ export const useCompositionRender = () => {
         setReady(next);
         setPhase('ready');
       } catch (renderError) {
+        // A plan describes a file; with none coming, keeping it would leave the frame it named on
+        // show and its per-clip facts readable against clips that have since moved.
+        setPlan(null);
         // A cancel is not an error: the operator asked, and the arrangement is as it was.
         if (controller.signal.aborted) {
           setProgress(0);

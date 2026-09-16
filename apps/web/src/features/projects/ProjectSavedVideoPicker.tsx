@@ -15,6 +15,7 @@ import { useProjectAssetsController } from './useProjectAssetsController';
 import { ProjectAssetThumbnail } from './ProjectAssetThumbnail';
 import {
   videoRowBadgeStyles,
+  videoRowCopyStyles,
   videoRowListStyles,
   videoRowPreviewStyles,
 } from './projectVideoRow.styles';
@@ -46,18 +47,6 @@ const selectStyles = (theme: Theme, selected: boolean) => ({
   [media.down('tablet')]: {
     gridTemplateColumns: '4rem minmax(0, 1fr)',
   },
-});
-
-const copyStyles = (theme: Theme) => ({
-  display: 'grid',
-  gap: theme.space.xxs,
-  minWidth: 0,
-  '& > span': {
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap' as const,
-  },
-  '& > small': { color: theme.colors.textMuted },
 });
 
 interface ProjectSavedVideoListProps {
@@ -133,7 +122,7 @@ export const ProjectSavedVideoList = ({
     return allVideos.filter(({ id }) => !promoted.has(id));
   }, [allVideos, attached]);
   const rowCss = rowStyles(theme);
-  const copyCss = copyStyles(theme);
+  const copyCss = videoRowCopyStyles(theme);
   const badgeCss = videoRowBadgeStyles(theme);
   const previewCss = videoRowPreviewStyles(theme);
   const listCss = videoRowListStyles(theme);

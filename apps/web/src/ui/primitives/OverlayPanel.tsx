@@ -67,10 +67,25 @@ export interface OverlayPanelProps {
   initialFocus?: OverlayPanelInitialFocus;
   initialFocusRef?: RefObject<HTMLElement | null>;
   returnFocusRef?: RefObject<HTMLElement | null>;
+  /**
+   * Called once the panel has actually left — after its exit transition, its isolation of the page
+   * lifted and focus handed back. Until then the page behind the panel is still `inert` and
+   * `aria-hidden`, so anything a caller says there on close is said where nothing can hear it.
+   */
+  onExited?: (() => void) | undefined;
   bodyMode?: OverlayPanelBodyMode;
   centered?: boolean;
 }
 
+/**
+ * How long the panel stays mounted after it is told to close, so it can animate out.
+ *
+ * It is also fully interactive for that long, and the page behind it stays `inert` and
+ * `aria-hidden`: a control that both closes the panel and acts can be pressed twice, and anything
+ * a caller says on the surface behind — a live region, say — is said where nothing can hear it.
+ * Guard such a control (`disabled` while closing), and use {@link OverlayPanelProps.onExited} for
+ * whatever has to wait until the page is back.
+ */
 const OVERLAY_EXIT_DURATION_MS = 220;
 
 const prefersReducedMotion = () =>
@@ -96,6 +111,7 @@ export const OverlayPanel = forwardRef<HTMLDivElement, OverlayPanelProps>(functi
     initialFocus = 'first-focusable',
     initialFocusRef,
     returnFocusRef,
+    onExited,
     bodyMode = 'scroll',
     centered = false,
   },
@@ -110,6 +126,7 @@ export const OverlayPanel = forwardRef<HTMLDivElement, OverlayPanelProps>(functi
   const headingRef = useRef<HTMLHeadingElement | null>(null);
   const backdropRef = useRef<HTMLDivElement | null>(null);
   const onCloseRef = useRef(onClose);
+  const onExitedRef = useRef(onExited);
   const openRef = useRef(open);
   const closeDisabledRef = useRef(closeDisabled);
   const initialFocusTargetRef = useRef(initialFocusRef);
@@ -121,6 +138,7 @@ export const OverlayPanel = forwardRef<HTMLDivElement, OverlayPanelProps>(functi
   );
 
   onCloseRef.current = onClose;
+  onExitedRef.current = onExited;
   openRef.current = open;
   closeDisabledRef.current = closeDisabled;
   initialFocusTargetRef.current = initialFocusRef;
@@ -247,6 +265,7 @@ export const OverlayPanel = forwardRef<HTMLDivElement, OverlayPanelProps>(functi
         const returnTarget = returnFocusTargetRef.current?.current ?? opener;
         if (canRestoreFocus(returnTarget)) returnTarget?.focus();
         else focusTopmostDialog();
+        onExitedRef.current?.();
       });
     };
   }, [initialFocus, overlayId, portalHost, present]);

@@ -17,8 +17,8 @@ import {
   removeProjectSourceById,
   type ProjectRevisionExpectation,
 } from './projectsApi';
-import { projectClipMediaCatalogue, type ProjectClipMedia } from './projectClipMedia';
-import { useProjectCurrentCut } from './useProjectCurrentCut';
+import { projectClipMediaCatalogue, type ProjectClipMediaCatalogue } from './projectClipMedia';
+import { useProjectCurrentCutQuery } from './useProjectCurrentCut';
 import type { ProjectSessionPort } from './useProjectSession';
 import { projectQueryKeys, reconcileProjectMedia } from './useProjectsController';
 import { useStableOperationKey } from './useStableOperationKey';
@@ -71,6 +71,16 @@ export const useProjectHeldSourceCount = (projectId: string, enabled: boolean): 
   return query.data?.sources.length ?? 0;
 };
 
+/** Where the two reads behind the catalogue have got to, so an empty catalogue can say why. */
+export type ProjectClipMediaCatalogueStatus = 'loading' | 'failed' | 'ready';
+
+export interface ProjectClipMediaCatalogueState {
+  readonly media: ProjectClipMediaCatalogue;
+  readonly status: ProjectClipMediaCatalogueStatus;
+  /** Asks again for whichever read failed. */
+  readonly retry: () => void;
+}
+
 /**
  * Everything an arrangement's clips may stand over, resolved and keyed.
  *
@@ -81,18 +91,31 @@ export const useProjectHeldSourceCount = (projectId: string, enabled: boolean): 
  */
 export const useProjectClipMediaCatalogue = (
   current: ProjectCurrentResponse,
-): ReadonlyMap<string, ProjectClipMedia> => {
+): ProjectClipMediaCatalogueState => {
   const projectId = current.project.id;
   const query = useQuery(sourcesQueryOptions(projectId));
+  const presentedMedia = current.revision.snapshot.presentedMedia;
   // Asked for only where the revision presents something: with nothing to describe, the read is a
   // round trip whose answer this catalogue would discard.
-  const presentedCut = useProjectCurrentCut(
-    current,
-    current.revision.snapshot.presentedMedia !== null,
-  );
+  const cutQuery = useProjectCurrentCutQuery(current, presentedMedia !== null);
   const sources = query.data?.sources;
-  const presentedMedia = current.revision.snapshot.presentedMedia;
-  return useMemo(
+  const presentedCut = cutQuery.data ?? null;
+  // A disabled query reads as pending too, so the cut only counts while it was actually asked for.
+  const cutAsked = presentedMedia !== null;
+  const cutFailed = cutAsked && cutQuery.isError;
+  const status: ProjectClipMediaCatalogueStatus =
+    query.isError || cutFailed
+      ? 'failed'
+      : query.isPending || (cutAsked && cutQuery.isPending)
+        ? 'loading'
+        : 'ready';
+  const { refetch: refetchSources } = query;
+  const { refetch: refetchCut } = cutQuery;
+  const retry = useCallback(() => {
+    if (query.isError) void refetchSources();
+    if (cutFailed) void refetchCut();
+  }, [cutFailed, query.isError, refetchCut, refetchSources]);
+  const media = useMemo(
     () =>
       projectClipMediaCatalogue(sources ?? [], {
         reference: presentedMedia,
@@ -100,6 +123,9 @@ export const useProjectClipMediaCatalogue = (
       }),
     [presentedCut, presentedMedia, sources],
   );
+  // Not memoised: the one consumer destructures it on the spot, so the wrapper's identity is
+  // never read. `media` itself is memoised above, which is the part that matters.
+  return { media, status, retry };
 };
 
 /**

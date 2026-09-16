@@ -79,10 +79,11 @@ export const ensureCurrentCut = (
   current: ProjectCurrentResponse,
 ): Promise<CurrentCut> => queryClient.ensureQueryData(currentCutQuery(current));
 
+/** The cut's query itself, for a caller that has to tell "not yet" from "none". */
+export const useProjectCurrentCutQuery = (current: ProjectCurrentResponse, enabled: boolean) =>
+  useQuery({ ...currentCutQuery(current), enabled });
+
 export const useProjectCurrentCut = (
   current: ProjectCurrentResponse,
   enabled: boolean,
-): CurrentCut | null => {
-  const query = useQuery({ ...currentCutQuery(current), enabled });
-  return query.data ?? null;
-};
+): CurrentCut | null => useProjectCurrentCutQuery(current, enabled).data ?? null;

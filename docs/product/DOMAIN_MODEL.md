@@ -118,9 +118,9 @@ revision-scoped `clip` links (D3). Since slice 4.1 (2026-09-14) the arrangement 
 through the Project session, seeded as one clip over the current cut; since slice 4.2 (2026-09-15)
 **Render arrangement** produces the stitched file and plays it as the preview, under one
 normalization policy (the largest clip's frame, each clip's own frame timing, the widest sound; see
-[the slice 4.2 plan](../roadmap/SLICE_4.2_STITCHED_RENDERING_PLAN.md)). Save still operates on the
-current cut (4.3), and a clip can be added from the Project's other media only once a control for
-it exists._
+[the slice 4.2 plan](../roadmap/SLICE_4.2_STITCHED_RENDERING_PLAN.md)), and **Add a clip** brings any
+of the Project's sources, or the cut it currently works from, into the arrangement as its last
+clip. Save still operates on the current cut (4.3)._
 
 ### Timeline
 
@@ -135,9 +135,9 @@ reorder, trim and level per clip — with the rendered arrangement as its previe
 A reference into source media with in/out trim points, occupying a position in the composition. A
 clip does not copy bytes; splitting a clip creates two references.
 _Status: modelled in snapshot v3 (`CompositionClip`: id, media reference, trim, audio level).
-The arrangement editor makes them — the first over the current cut, the rest by splitting — and
-the stitched render draws each into the arrangement's one frame; a control that adds a clip from
-the Project's other media is the gap the slice 4.2 plan names first._
+The arrangement editor makes them — the first over the current cut, the rest by splitting or by
+**Add a clip**, which takes the whole of any source the Project holds or of the cut it currently
+works from — and the stitched render draws each into the arrangement's one frame._
 
 ### Subtitle track / subtitle cue
 

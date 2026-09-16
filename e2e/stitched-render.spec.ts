@@ -20,10 +20,11 @@ import {
  * the frame policy, the audio conformance and the burned-in cue survive contact with WebCodecs,
  * and it is where the render budget the roadmap asks for is measured rather than estimated.
  *
- * Driven at the module level on purpose. The product has no control that puts two different
- * sources into one arrangement yet (recorded in the slice 4.2 plan), so the only way to render a
- * mixed-format arrangement today is to ask the render client directly, with the fixtures held in
- * the page as blob URLs — which also keeps this journey free of the API.
+ * Driven at the module level on purpose. The surface's own path to a mixed arrangement is the
+ * real-stack journey in `real-stack-project-deliverable.spec.ts`, which needs the API; this one
+ * asks the render client directly, with the fixtures held in the page as blob URLs, because it is
+ * the only place the fifth-of-a-second AAC recording, all three formats and the render budget are
+ * exercised together without a server.
  */
 
 type ClipFacts = Readonly<{

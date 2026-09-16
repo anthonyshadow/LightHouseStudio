@@ -247,8 +247,8 @@ the whole arrangement — the largest clip's, every other clip fitted inside it 
 frame timing carried, and the widest sound; the audio half landed first
 ([the mixed-audio plan](SLICE_4.2_MIXED_AUDIO_PLAN.md)) and the concat loop feeds it. The accurate
 preview is the rendered file, played in the arrangement editor; nothing is saved from it until 4.3.
-Reachable in the product only over splits of one video until a clip can be added from the Project's
-other media — the gap the plan names first.
+The gap the plan named first — no control added a clip from the Project's other media — was closed
+the same day: **Add a clip** takes any video the Project holds as the last clip.
 4.3 Composition save/export: the composition is what Save operates on; variant sets from 2.3
 apply to it.
 4.4 Pipeline convergence: standalone Studio becomes a thin entry to the durable engine ("make

@@ -18,9 +18,16 @@ import {
   type ReactNode,
 } from 'react';
 import { Button, StatusNotice, VisuallyHidden } from '../../ui';
-import { clipMediaOf, type ProjectClipMedia } from '../projects/projectClipMedia';
+import {
+  clipMediaOf,
+  type ProjectClipMedia,
+  type ProjectClipMediaCatalogue,
+  type ProjectClipMediaEntry,
+} from '../projects/projectClipMedia';
+import type { ProjectClipMediaCatalogueStatus } from '../projects/useProjectMediaController';
 import type { ProjectSessionPort } from '../projects/useProjectSession';
 import { VideoPlayer } from '../video-player/VideoPlayer';
+import { CompositionClipPicker } from './CompositionClipPicker';
 import { EditRange } from './EditRange';
 import {
   clipStripCaptionStyles,
@@ -38,16 +45,50 @@ import { useCompositionSession } from './useCompositionSession';
 import { useVideoEditExportSupport } from './useVideoEditExportSupport';
 import { renderProgressStyles } from './VideoEditWorkspace.styles';
 
-/** Why the cut the operator is pointing at cannot be made, in words rather than as a dead control. */
-const SPLIT_REFUSAL_NOTICE: Record<CompositionSplitRefusal, string> = {
-  empty: 'Arrange at least one clip before splitting.',
-  'at-cut': 'The playhead is already on a cut. Move it inside a clip to split there.',
-  'too-short': 'A split here would leave a clip under a tenth of a second.',
-  'at-limit': 'This arrangement is full. Remove a clip before splitting another.',
+const SPLIT_REASON_ID = 'composition-split-reason';
+const ARRANGEMENT_FULL_REASON_ID = 'composition-full-reason';
+
+/**
+ * Why the cut the operator is pointing at cannot be made, in words rather than as a dead control.
+ *
+ * Each reason carries the notice that says it, because a full arrangement refuses the split and the
+ * add for the one reason: that one names the shared notice, both controls describe themselves by
+ * it, and it is said once rather than twice in slightly different words one above the other.
+ */
+const SPLIT_REFUSAL_NOTICE: Record<
+  CompositionSplitRefusal,
+  { readonly id: string; readonly title: string; readonly text: string }
+> = {
+  empty: {
+    id: SPLIT_REASON_ID,
+    title: 'Cannot split here',
+    text: 'Arrange at least one clip before splitting.',
+  },
+  'at-cut': {
+    id: SPLIT_REASON_ID,
+    title: 'Cannot split here',
+    text: 'The playhead is already on a cut. Move it inside a clip to split there.',
+  },
+  'too-short': {
+    id: SPLIT_REASON_ID,
+    title: 'Cannot split here',
+    text: 'A split here would leave a clip under a tenth of a second.',
+  },
+  'at-limit': {
+    id: ARRANGEMENT_FULL_REASON_ID,
+    title: 'Arrangement full',
+    text: 'This arrangement holds as many clips as it can. Remove a clip before splitting or adding another.',
+  },
 };
 
 const MEDIA_MISSING_NOTICE =
   'This clip stands over media this Project can no longer open. Remove it, or restore the video it came from.';
+
+/**
+ * An add the session would not stage. The session's own message goes to the Project route, which
+ * this surface hides while it has the stage, so the refusal is said here or not at all.
+ */
+const ADD_REFUSED_NOTICE = 'That video could not be added. Your arrangement is unchanged.';
 
 const RENDER_UNSUPPORTED_NOTICE =
   'This browser cannot render this arrangement without blocking the Studio. Your clips are unchanged, and you can keep arranging.';
@@ -105,8 +146,12 @@ const clipRenderNotices = (
 export interface CompositionSurfaceProps {
   readonly current: ProjectCurrentResponse;
   readonly session: ProjectSessionPort;
-  /** Everything a clip may stand over, already resolved. */
-  readonly media: ReadonlyMap<string, ProjectClipMedia>;
+  /** Everything a clip may stand over, already resolved, in the order the Project lists it. */
+  readonly media: ProjectClipMediaCatalogue;
+  /** Where the read behind `media` has got to, so an empty list of videos to add can say why. */
+  readonly mediaStatus: ProjectClipMediaCatalogueStatus;
+  /** Asks for the Project's media again after a failed read. */
+  readonly onRetryMedia: () => void;
   readonly archived: boolean;
   readonly onClose: () => void;
   /** Whether a render is in flight, for the guard that must not abandon a worker. */
@@ -133,6 +178,8 @@ export const CompositionSurface = ({
   current,
   session,
   media,
+  mediaStatus,
+  onRetryMedia,
   archived,
   onClose,
   onRenderingChange,
@@ -152,6 +199,8 @@ export const CompositionSurface = ({
     splitRefusal,
     split,
     arrange,
+    add,
+    atLimit,
     beginGesture,
     endGesture,
     move,
@@ -174,12 +223,40 @@ export const CompositionSurface = ({
   const selectedTileCss = clipTileStyles(theme, true);
   const stripRef = useRef<HTMLUListElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const addClipRef = useRef<HTMLButtonElement>(null);
   /* The clip a reorder should hand focus back to, held in a ref: the effect below has to run
    * after the strip re-renders, and writing state there would cascade a second render for a value
    * nothing paints. */
   const focusClipIdRef = useRef<string | null>(null);
-  const [announcement, setAnnouncement] = useState('');
+  /*
+   * What the live region says, with a count beside it: React writes nothing to the DOM when the
+   * same string is set twice, and a screen reader announces a live region only when it changes —
+   * so the text is remounted on every announcement, and "Clip removed" twice is heard twice.
+   */
+  const [announced, setAnnounced] = useState({ text: '', nonce: 0 });
   const [playbackFailed, setPlaybackFailed] = useState(false);
+  const [pickingClip, setPickingClip] = useState(false);
+  /**
+   * What the last choice from the picker did, held until the panel has gone.
+   *
+   * While a panel is closing, the page behind it is still `inert` and `aria-hidden`: a live region
+   * written then is written where nothing can hear it, and the new clip's tile cannot take focus.
+   * The panel says when it has left, and both happen then.
+   */
+  const [addOutcome, setAddOutcome] = useState<{
+    readonly clipId: string | null;
+    readonly notice: string;
+  } | null>(null);
+  const announce = useCallback(
+    (text: string) => setAnnounced((held) => ({ text, nonce: held.nonce + 1 })),
+    [],
+  );
+  /** The strip's tile for a clip, which is the focusable thing a clip id names. */
+  const clipTile = useCallback(
+    (clipId: string): HTMLElement | null =>
+      stripRef.current?.querySelector<HTMLElement>(`[data-clip-id="${clipId}"]`) ?? null,
+    [],
+  );
   // A render reads the arrangement as it stands; no gesture may change it underneath.
   const blocked = archived || rendering;
 
@@ -203,13 +280,10 @@ export const CompositionSurface = ({
     return () => onRenderingChange?.(false);
   }, [onRenderingChange, rendering]);
 
-  // Derived rather than set: the phase is the fact, and the live region reads it directly.
-  const renderAnnouncement =
-    render.phase === 'ready'
-      ? 'The arrangement is rendered.'
-      : render.phase === 'error'
-        ? 'The render failed.'
-        : '';
+  // Derived rather than set: the phase is the fact, and the live region reads it directly. Only
+  // the ready state needs a voice here — the progress region announces the render starting, and
+  // the failure notice is an alert of its own.
+  const renderAnnouncement = render.phase === 'ready' ? 'The arrangement is rendered.' : '';
 
   // Selecting a clip moves the playhead to its start, so the two never disagree about what is on
   // screen — and the preview below seeks to the same instant from the other direction.
@@ -230,8 +304,8 @@ export const CompositionSurface = ({
     const clipId = focusClipIdRef.current;
     if (clipId === null) return;
     focusClipIdRef.current = null;
-    stripRef.current?.querySelector<HTMLElement>(`[data-clip-id="${clipId}"]`)?.focus();
-  }, [placements]);
+    clipTile(clipId)?.focus();
+  }, [clipTile, placements]);
 
   const moveBy = useCallback(
     (placement: CompositionPlacement, delta: number) => {
@@ -240,9 +314,9 @@ export const CompositionSurface = ({
       if (toIndex < 0 || toIndex >= placements.length) return;
       if (!move(placement.clip.id, toIndex)) return;
       focusClipIdRef.current = placement.clip.id;
-      setAnnouncement(`Clip moved to position ${toIndex + 1} of ${placements.length}.`);
+      announce(`Clip moved to position ${toIndex + 1} of ${placements.length}.`);
     },
-    [blocked, move, placements.length],
+    [announce, blocked, move, placements.length],
   );
 
   const onStripKeyDown = useCallback(
@@ -286,9 +360,38 @@ export const CompositionSurface = ({
     const resolved = clipMedia.filter((held): held is ProjectClipMedia => held !== null);
     if (resolved.length !== clipMedia.length) return;
     setPlaybackFailed(false);
-    setAnnouncement('Rendering the arrangement.');
     void render.render(arrangement, resolved);
   }, [arrangement, clipMedia, render, rendering]);
+
+  /*
+   * A chosen video becomes the last clip and the selected one; the strip re-renders under the
+   * closing panel, so the result is said aloud the way a reorder is. The count named is the count
+   * after the add — the position the new clip holds.
+   */
+  const chooseClip = useCallback(
+    (entry: ProjectClipMediaEntry) => {
+      setPickingClip(false);
+      const added = add(entry.reference, entry.media.durationMs);
+      const count = placements.length + 1;
+      setAddOutcome({
+        clipId: added,
+        notice:
+          added === null
+            ? ADD_REFUSED_NOTICE
+            : `Added “${entry.media.filename}” as clip ${count} of ${count}.`,
+      });
+    },
+    [add, placements.length],
+  );
+
+  const onPickerExited = useCallback(() => {
+    if (addOutcome === null) return;
+    // The panel has already handed focus back to the control that opened it; a clip that was
+    // added takes it from there, because that control is disabled once the arrangement is full —
+    // which is exactly the add that must not drop focus on the page.
+    if (addOutcome.clipId !== null) clipTile(addOutcome.clipId)?.focus();
+    announce(addOutcome.notice);
+  }, [addOutcome, announce, clipTile]);
 
   if (arrangement === null) {
     /*
@@ -332,6 +435,7 @@ export const CompositionSurface = ({
     );
   }
 
+  const splitReason = splitRefusal === null ? null : SPLIT_REFUSAL_NOTICE[splitRefusal];
   /*
    * The render control is refused with a stated reason, the way the split is: a disabled button
    * with no sentence beside it is a dead end. `null` from the probe is still asking, and says
@@ -469,9 +573,20 @@ export const CompositionSurface = ({
         <Button
           disabled={blocked || splitRefusal !== null}
           onClick={split}
-          aria-describedby={splitRefusal === null ? undefined : 'composition-split-reason'}
+          aria-describedby={splitReason?.id}
         >
           Split at playhead
+        </Button>
+        <Button
+          ref={addClipRef}
+          disabled={blocked || atLimit}
+          onClick={() => {
+            setAddOutcome(null);
+            setPickingClip(true);
+          }}
+          aria-describedby={atLimit ? ARRANGEMENT_FULL_REASON_ID : undefined}
+        >
+          Add a clip
         </Button>
         <Button variant="quiet" disabled={!canUndo || rendering} onClick={undo}>
           Undo
@@ -488,16 +603,16 @@ export const CompositionSurface = ({
           Render arrangement
         </Button>
       </div>
-      {splitRefusal === null ? null : (
-        <StatusNotice
-          id="composition-split-reason"
-          role="status"
-          tone="neutral"
-          title="Cannot split here"
-        >
-          {SPLIT_REFUSAL_NOTICE[splitRefusal]}
+      {splitReason === null ? null : (
+        <StatusNotice id={splitReason.id} role="status" tone="neutral" title={splitReason.title}>
+          {splitReason.text}
         </StatusNotice>
       )}
+      {addOutcome?.clipId === null ? (
+        <StatusNotice role="alert" tone="danger" title="Clip not added">
+          {ADD_REFUSED_NOTICE}
+        </StatusNotice>
+      ) : null}
       {renderRefusal === null ? null : (
         <StatusNotice
           id="composition-render-reason"
@@ -654,7 +769,7 @@ export const CompositionSurface = ({
                 onClick={() => {
                   const wasLast = placements.length === 1;
                   if (!remove(selectedClip.clip.id)) return;
-                  setAnnouncement(
+                  announce(
                     wasLast
                       ? 'The last clip was removed, so this Project is no longer arranged.'
                       : 'Clip removed from the arrangement.',
@@ -674,8 +789,23 @@ export const CompositionSurface = ({
         </div>
       </div>
 
-      <VisuallyHidden aria-live="polite">{announcement}</VisuallyHidden>
-      <VisuallyHidden aria-live="polite">{renderAnnouncement}</VisuallyHidden>
+      <CompositionClipPicker
+        open={pickingClip}
+        media={media}
+        status={mediaStatus}
+        onRetry={onRetryMedia}
+        composition={arrangement}
+        returnFocusRef={addClipRef}
+        onClose={() => setPickingClip(false)}
+        onExited={onPickerExited}
+        onChoose={chooseClip}
+      />
+
+      {/* `status` is what makes these live; an `aria-live` attribute on the primitive is dropped. */}
+      <VisuallyHidden role="status">
+        <span key={announced.nonce}>{announced.text}</span>
+      </VisuallyHidden>
+      <VisuallyHidden role="status">{renderAnnouncement}</VisuallyHidden>
     </section>
   );
 };

@@ -19,7 +19,12 @@ anything but the arrangement itself.
    inspector trims it in its own media time, sets its level and mute, moves it earlier or later,
    and removes it; removing the last clip un-arranges the Project. **Split at playhead** cuts the
    clip under the playhead in two — refused, with the reason beside the control, on a cut, inside
-   the last tenth of a second, or in a full arrangement. Undo and Redo step the arrangement back and
+   the last tenth of a second, or in a full arrangement. **Add a clip** opens a panel listing every
+   video the Project holds — its sources and the cut it presents — with each one's frame, length,
+   whether it carries sound, and how many clips already stand over it; choosing one adds the whole
+   of it as the last clip, selects it, moves the playhead to its start, puts focus on it and says
+   so. The same video may be added more than once. A full arrangement refuses the split and the
+   add with one notice that both controls point at. Undo and Redo step the arrangement back and
    forward through the same session.
 4. **Render arrangement** produces the stitched file on this device and plays it. It is disabled
    until the browser has shown it can encode, with a notice when it cannot, and refused with a
@@ -74,16 +79,19 @@ widest source is the target, and no clip is narrowed for a neighbour.
   open at a time, so an arrangement of a hundred clips never holds a hundred files.
 - Nothing is saved from this surface. Saving an arrangement, and exporting it to placements, is
   slice 4.3's; the rendered Blob and its plan are what that slice will use.
-- Today no control adds a clip from the Project's other media, so an arrangement is splits of one
-  video; a mixed-format arrangement is exercised by the worker's own tests and by the Chromium
-  fixture render in `e2e/stitched-render.spec.ts`.
+- A clip is added from media the Project already holds; the panel does not upload, record or
+  borrow — that is the Media area's, and a video added there is offered here on the next open.
+  While the Project's media is still being read the panel says so rather than reporting nothing,
+  and a read that failed is shown as that, with **Retry**.
 
 ## Evidence status
 
 - Domain rules, the concat loop against a fake runtime, the worker's protocol, the render client,
   the render hook and the surface's states are covered by vitest.
 - The real encoder is exercised in Chromium: three committed fixtures of three formats through the
-  render client (`e2e/stitched-render.spec.ts`), and the surface's own journey over a split source
-  on the real stack (`e2e/real-stack-project-deliverable.spec.ts`), both printing their timings.
+  render client (`e2e/stitched-render.spec.ts`), and the surface's own journey on the real stack
+  (`e2e/real-stack-project-deliverable.spec.ts`) — a portrait source split in two, a 16:9 second
+  video added as the third clip, the mixed arrangement rendered and its frame read back with bars
+  where the policy puts them — both printing their timings.
 - Playback of the rendered file in the page's `<video>` needs an engine that decodes H.264 there;
   the automated Linux Chromium does not, and the surface says so rather than showing a black player.

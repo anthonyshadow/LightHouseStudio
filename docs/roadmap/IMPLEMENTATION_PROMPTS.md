@@ -390,9 +390,10 @@ capture-bridge tests; e2e add-second-source journey (real stack).
 > video half is decided there: the largest clip's frame, evened, with every clip fitted inside it
 > over black; each clip's own frame timing carried onto the sequence clock; codec not a target
 > dimension. The accurate stitched preview is the rendered file itself, played in the arrangement
-> editor. One gap is recorded for whoever runs next, before prompt 35: **no control adds a clip from
-> the Project's other media**, so in the product every arrangement is splits of one video and a
-> mixed-format arrangement is reached only by the worker tests and the Chromium fixture render.
+> editor. The gap it recorded for whoever ran next — **no control added a clip from the Project's
+> other media** — was closed the same day (2026-09-15, §8.6 of the same record): **Add a clip** in
+> the arrangement editor takes any video the Project holds as the last clip, and the real-stack
+> journey now renders a mixed-format arrangement through the product's own surface.
 
 **32 (A) — Timeline UI: audit.** Standard audit-and-plan for slice 4.1 (edit-1, web-7). Inspect
 the editor stack (`VideoEditWorkspace/Timeline/StagePreview`, `useVideoEditSession`), the v3

@@ -4,8 +4,11 @@ import {
   CompositionRuleError,
   appendClip,
   clipMediaMsAt,
+  clipOverMedia,
   compositionClipDurationMs,
   compositionDurationMs,
+  compositionIsFull,
+  compositionOverMedia,
   compositionPlacementAt,
   compositionPlacements,
   compositionSplitRefusal,
@@ -128,6 +131,43 @@ describe('composition clip operations', () => {
       clips: Array.from({ length: COMPOSITION_CLIP_LIMIT }, (_, index) => clip(index + 1)),
     };
     expect(() => appendClip(full, clip(COMPOSITION_CLIP_LIMIT + 1))).toThrow(CompositionRuleError);
+  });
+
+  it('makes one clip over the whole of a piece of media, carrying the id the caller minted', () => {
+    const media = { kind: 'asset', assetId: sourceAssetId } as const;
+    const whole = clipOverMedia(media, 7_250, clipId(4));
+    expect(whole).toEqual({
+      id: clipId(4),
+      media,
+      trim: { startMs: 0, endMs: 7_250 },
+      audio: { level: 100, muted: false },
+    });
+    // A media record with no duration still yields a storable clip; a bad id never yields one.
+    expect(clipOverMedia(media, 0, clipId(5)).trim.endMs).toBe(VIDEO_EDIT_MINIMUM_TRIM_MS);
+    expect(() => clipOverMedia(media, 1_000, '')).toThrow(CompositionRuleError);
+    // Added to an arrangement it is the last clip; alone, it is the arrangement a Project starts from.
+    expect(ids(appendClip(composition(), whole))).toEqual([clipId(1), clipId(2), clipId(4)]);
+    expect(compositionOverMedia(media, 7_250, () => clipId(4))).toEqual({
+      clips: [whole],
+      subtitles: [],
+    });
+    expect(() => validateComposition(appendClip(composition(), whole))).not.toThrow();
+  });
+
+  it('says when the arrangement is full before a clip is offered, and refuses one past it', () => {
+    const value = composition();
+    expect(compositionIsFull(value)).toBe(false);
+    const full = {
+      ...value,
+      clips: Array.from({ length: COMPOSITION_CLIP_LIMIT }, (_, index) => clip(index + 1)),
+    };
+    expect(compositionIsFull(full)).toBe(true);
+    expect(() =>
+      appendClip(
+        full,
+        clipOverMedia({ kind: 'asset', assetId: sourceAssetId }, 1_000, clipId(101)),
+      ),
+    ).toThrow(CompositionRuleError);
   });
 
   it('keeps every trim and level storable, so an edited arrangement still validates', () => {

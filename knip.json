@@ -27,7 +27,7 @@
     },
     "apps/api": {
       "entry": ["src/server.ts!", "src/**/*.test.ts"],
-      "project": ["src/**/*.ts!", "!src/test/**!"],
+      "project": ["src/**/*.ts!", "!src/test/**!", "!src/**/*.test-support.ts!"],
       "ignoreExportsUsedInFile": true
     },
     "apps/web": {

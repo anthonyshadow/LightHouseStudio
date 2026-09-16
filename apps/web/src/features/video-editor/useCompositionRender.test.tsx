@@ -150,6 +150,7 @@ describe('useCompositionRender', () => {
     act(() => {
       pending = hook.result.current.render(composition, media);
     });
+    act(() => deferred.input().onPlan?.(plan));
     act(() => hook.result.current.cancel());
     expect(deferred.input().signal.aborted).toBe(true);
     // Still rendering until the worker has acknowledged, or the client has given up on it.
@@ -160,6 +161,8 @@ describe('useCompositionRender', () => {
     });
     expect(hook.result.current.phase).toBe('idle');
     expect(hook.result.current.error).toBeNull();
+    // The plan described a file that is not coming.
+    expect(hook.result.current.plan).toBeNull();
   });
 
   it('treats a cancel that lands as the worker finishes as the cancel it is, and is not stuck', async () => {
@@ -228,11 +231,14 @@ describe('useCompositionRender', () => {
       pending = hook.result.current.render(composition, media);
     });
     await act(async () => {
+      deferred.input().onPlan?.(plan);
       deferred.reject(new Error('“a.mp4” has no video track.'));
       await pending;
     });
     expect(hook.result.current.phase).toBe('error');
     expect(hook.result.current.error).toBe('“a.mp4” has no video track.');
+    // A failed render's plan is not kept: nothing on show is what it described.
+    expect(hook.result.current.plan).toBeNull();
 
     validateEditedVideoOutput.mockRejectedValueOnce(
       new Error('The edited video dimensions did not match the requested crop.'),

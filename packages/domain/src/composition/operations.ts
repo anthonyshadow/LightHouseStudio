@@ -41,8 +41,17 @@ const clipIndexOf = (composition: Composition, clipId: string): number => {
 const withClips = (composition: Composition, clips: readonly CompositionClip[]): Composition =>
   normalizeComposition({ ...composition, clips });
 
+/**
+ * Whether one more clip would take the arrangement past its limit.
+ *
+ * Asked before a control is offered — the add and the split both mint a clip — so the answer is
+ * one predicate rather than a comparison restated wherever a clip is made.
+ */
+export const compositionIsFull = (composition: Composition): boolean =>
+  composition.clips.length >= COMPOSITION_CLIP_LIMIT;
+
 export const appendClip = (composition: Composition, clip: CompositionClip): Composition => {
-  if (composition.clips.length >= COMPOSITION_CLIP_LIMIT) {
+  if (compositionIsFull(composition)) {
     fail(`A composition holds at most ${COMPOSITION_CLIP_LIMIT} clips.`);
   }
   requireOpaqueId(clip.id, 'Composition clip', fail);
@@ -53,28 +62,41 @@ export const appendClip = (composition: Composition, clip: CompositionClip): Com
 };
 
 /**
- * The first arrangement over one piece of media, trimmed to the whole of it.
+ * One piece of media as one clip, trimmed to the whole of it.
  *
- * A Project holds media long before anyone arranges it, so the first clip is made rather than found.
- * It lives here because it is the only composition this product mints, and a clip assembled in a
- * component would be the one clip no rule shapes: the trim floor, the audio default and the id check
- * all have one owner, and this is how a surface reaches them without restating any of them.
+ * The only clip this product mints that is not half of another: the first arrangement is made of
+ * one, and every clip added from the Project's other media is one. It lives here because a clip
+ * assembled in a component would be the one clip no rule shapes — the trim floor, the audio default
+ * and the id check all have one owner, and this is how a surface reaches them without restating any
+ * of them. The id is the caller's, as every id here is: a surface that adds a clip selects it next,
+ * and it can only do that with the id it minted. Checked where it is minted, as the split checks
+ * its own, so a clip from here is storable before anything appends it.
+ */
+export const clipOverMedia = (
+  media: ProjectMediaReference,
+  durationMs: number,
+  id: string,
+): CompositionClip => ({
+  id: requireOpaqueId(id, 'Composition clip', fail),
+  media,
+  // Normalized on the way in, so a media record with no duration still yields a storable clip.
+  trim: { startMs: 0, endMs: Math.max(durationMs, VIDEO_EDIT_MINIMUM_TRIM_MS) },
+  audio: DEFAULT_VIDEO_EDIT_AUDIO,
+});
+
+/**
+ * The first arrangement over one piece of media.
+ *
+ * A Project holds media long before anyone arranges it, so the first clip is made rather than found:
+ * one clip over the cut the Project works from, which is the arrangement that renders to exactly
+ * what the Project produces today.
  */
 export const compositionOverMedia = (
   media: ProjectMediaReference,
   durationMs: number,
   createId: () => string,
 ): Composition =>
-  appendClip(
-    { clips: [], subtitles: [] },
-    {
-      id: createId(),
-      media,
-      // Normalized on the way in, so a media record with no duration still yields a storable clip.
-      trim: { startMs: 0, endMs: Math.max(durationMs, VIDEO_EDIT_MINIMUM_TRIM_MS) },
-      audio: DEFAULT_VIDEO_EDIT_AUDIO,
-    },
-  );
+  appendClip({ clips: [], subtitles: [] }, clipOverMedia(media, durationMs, createId()));
 
 /**
  * The arrangement without one clip, or `null` when that was the last of them.
@@ -141,7 +163,7 @@ export const compositionSplitRefusal = (
 ): CompositionSplitRefusal | null => {
   const placement = compositionPlacementAt(composition, sequenceMs);
   if (placement === null) return 'empty';
-  if (composition.clips.length >= COMPOSITION_CLIP_LIMIT) return 'at-limit';
+  if (compositionIsFull(composition)) return 'at-limit';
   const mediaMs = clipMediaMsAt(placement, sequenceMs);
   // On a cut the instant belongs to the clip starting there, so the left half would be empty. The
   // end of the sequence lands the same way on the right half; both are "there is no cut to make".

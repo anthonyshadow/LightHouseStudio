@@ -20,6 +20,7 @@ afterEach(() => {
 
 interface HarnessProps {
   onClose?: () => void;
+  onExited?: () => void;
   onUnderlayClick?: () => void;
   closeOnBackdrop?: boolean;
   closeDisabled?: boolean;
@@ -29,6 +30,7 @@ interface HarnessProps {
 
 const Harness = ({
   onClose = vi.fn(),
+  onExited,
   onUnderlayClick = vi.fn(),
   closeOnBackdrop = true,
   closeDisabled = false,
@@ -58,6 +60,7 @@ const Harness = ({
           onClose();
           setOpen(false);
         }}
+        onExited={onExited}
       >
         <button type="button">First action</button>
       </OverlayPanel>
@@ -406,6 +409,30 @@ describe('OverlayPanel', () => {
     );
     expect(screen.getByRole('heading', { name: 'Studio tools' })).toHaveFocus();
     expect(screen.getByRole('button', { name: 'Close panel' })).not.toHaveFocus();
+  });
+
+  it('says when it has left — after the page is audible again and focus is back', async () => {
+    const seen: string[] = [];
+    const onExited = vi.fn(() => {
+      seen.push(
+        `dialog:${document.querySelector('[role="dialog"]') === null} ` +
+          `hidden:${document.querySelectorAll('[aria-hidden="true"][inert]').length} ` +
+          `focus:${document.activeElement?.textContent ?? ''}`,
+      );
+    });
+    render(<Harness onExited={onExited} />);
+    const opener = screen.getByRole('button', { name: 'Open tools' });
+    opener.focus();
+    fireEvent.click(opener);
+    await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
+    // While open, the page behind the panel is isolated.
+    expect(document.querySelectorAll('[aria-hidden="true"][inert]').length).toBeGreaterThan(0);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    // Not yet: the panel is still on screen, leaving.
+    expect(onExited).not.toHaveBeenCalled();
+    await waitFor(() => expect(onExited).toHaveBeenCalledTimes(1));
+    // By then the dialog is gone, nothing is isolated any more, and the opener has focus.
+    expect(seen).toEqual(['dialog:true hidden:0 focus:Open tools']);
   });
 
   it('skips the exit delay when reduced motion is requested', async () => {

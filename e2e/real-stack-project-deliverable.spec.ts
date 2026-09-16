@@ -4,7 +4,10 @@ import {
   readRenderedFrameInk,
   type FrameBand,
 } from './support/browserMediaProbe';
-import { loadPortraitH264VideoFixture } from './support/existingVideoHarness';
+import {
+  loadDecodableH264VideoFixture,
+  loadPortraitH264VideoFixture,
+} from './support/existingVideoHarness';
 
 /**
  * The journeys that run against the stack CI provisions — a real login, real Project routes, real
@@ -19,9 +22,10 @@ import { loadPortraitH264VideoFixture } from './support/existingVideoHarness';
  * adopt a captioned on-device render as the current cut, save that cut for three placements at
  * once, read the pixels of all three back, and download the bytes the server kept. The second: take
  * a Project from one video to two through the Media area, stream the second one back from its own
- * content route, and let it go again. The third: arrange a Project's video, split it, render the
- * arrangement through the surface and read the file back. Every external host is blocked and
- * reported, so a regression that started contacting one fails here too.
+ * content route, and let it go again. The third: arrange a Project's video, split it, add a second
+ * video of another shape as a third clip, render the arrangement through the surface and read the
+ * file back. Every external host is blocked and reported, so a regression that started contacting
+ * one fails here too.
  */
 
 const ORIGIN_FALLBACK = 'http://127.0.0.1:4173';
@@ -572,15 +576,16 @@ test('a Project takes on a second video, previews it, and lets it go again throu
   }
 });
 
-test('an arrangement renders through the Project surface on the running API, and the file reads back', async ({
+test('a mixed arrangement renders through the Project surface on the running API, and the file reads back', async ({
   page,
   baseURL,
 }) => {
   /*
-   * One upload and one stitched render of two clips split from one source, no save: the phase
-   * timings this prints are the budget. Until an arrangement can take a clip from a second piece
-   * of media, this is the product's own path to a stitched render; the mixed-format render is
-   * measured at the module level in `stitched-render.spec.ts`.
+   * Two uploads and one stitched render of three clips — two halves of a portrait source and the
+   * whole of a 16:9 second video — no save: the phase timings this prints are the budget. This is
+   * the product's own path to a mixed-format render, so the policy's frame and bars are asserted
+   * on the file the surface played; `stitched-render.spec.ts` measures the same policy at the
+   * module level with sound.
    */
   test.setTimeout(240_000);
   const clock = phaseClock();
@@ -592,10 +597,12 @@ test('an arrangement renders through the Project surface on the running API, and
     renditionAssetIds: [],
   };
   const blocked = await blockExternalHosts(page);
-  // A second of portrait video: long enough to split in two and keep both halves. The committed
-  // clip that carries sound is a fifth of a second, so the audio path is proven at the module
-  // level in `stitched-render.spec.ts` rather than here.
-  const fixture = await loadPortraitH264VideoFixture();
+  // A second of portrait video: long enough to split in two and keep both halves. A second of
+  // 1280x720 beside it, so the arrangement has two shapes and the policy has a bar to draw. The
+  // committed clip that carries sound is a fifth of a second, so the audio path is proven at the
+  // module level in `stitched-render.spec.ts` rather than here.
+  const portrait = await loadPortraitH264VideoFixture();
+  const landscape = await loadDecodableH264VideoFixture();
 
   try {
     const projectId = await createProject(page, residue);
@@ -604,27 +611,51 @@ test('an arrangement renders through the Project surface on the running API, and
     await page.locator('input[type="file"][accept*="video/mp4"]').setInputFiles({
       name: 'arranged-source.mp4',
       mimeType: 'video/mp4',
-      buffer: fixture,
+      buffer: portrait,
     });
     await expect(page.getByRole('heading', { name: 'Original video ready' })).toBeVisible({
       timeout: 60_000,
     });
-    clock.mark('upload source');
+    // The second video goes in through the Media area, before the arrangement takes the stage:
+    // the arrangement adds clips from what the Project holds and never takes a file itself.
+    const media = page.getByRole('region', { name: 'Media in this Project' });
+    await media
+      .locator('input[type="file"][accept*="video/mp4"]')
+      .setInputFiles({ name: 'second-source.mp4', mimeType: 'video/mp4', buffer: landscape });
+    await expect(media.getByText('“second-source.mp4” is now part of this Project.')).toBeVisible({
+      timeout: 60_000,
+    });
+    clock.mark('upload two sources');
 
-    // Arrange it as one clip, then cut it in two at the middle.
+    // Arrange the original as one clip, cut it in two at the middle, then add the second video.
     await page.getByRole('button', { name: 'Arrange', exact: true }).click();
     await page.getByRole('button', { name: 'Arrange this video' }).click();
     const strip = page.getByRole('listbox', { name: 'Clips in this arrangement' });
     await expect(strip.getByRole('option')).toHaveCount(1);
     const playhead = page.getByRole('slider', { name: 'Playhead' });
-    const durationMs = Number(await playhead.getAttribute('max'));
-    expect(durationMs).toBeGreaterThan(200);
-    await playhead.fill(String(Math.round(durationMs / 20) * 10));
+    const portraitMs = Number(await playhead.getAttribute('max'));
+    expect(portraitMs).toBeGreaterThan(200);
+    await playhead.fill(String(Math.round(portraitMs / 20) * 10));
     await page.getByRole('button', { name: 'Split at playhead' }).click();
     await expect(strip.getByRole('option')).toHaveCount(2);
+    await page.getByRole('button', { name: 'Add a clip' }).click();
+    const picker = page.getByRole('dialog', { name: 'Add a clip' });
+    // Both videos the Project holds, the original saying it is already in the arrangement twice.
+    await expect(picker.getByRole('button', { name: /^arranged-source\.mp4/u })).toContainText(
+      'Already in this arrangement as 2 clips.',
+    );
+    await picker.getByRole('button', { name: /^second-source\.mp4/u }).click();
+    await expect(picker).toBeHidden();
+    await expect(strip.getByRole('option')).toHaveCount(3);
+    // The whole of the second video, last, and selected: the strip and the playhead both say so.
+    await expect(strip.getByRole('option', { selected: true })).toContainText('Clip 3 of 3');
+    await expect(strip.getByRole('option').nth(2)).toContainText('second-source.mp4');
+    const totalMs = Number(await playhead.getAttribute('max'));
+    expect(totalMs).toBeGreaterThan(portraitMs + 200);
+    await expect(playhead).toHaveValue(String(portraitMs));
     // The arrangement is autosaved through the Project session like any other change; the
     // surface hides the Project route (and its autosave stamp) while it has the stage, so the
-    // server is asked directly whether the two clips arrived.
+    // server is asked directly whether the three clips arrived.
     await expect
       .poll(
         async () => {
@@ -639,35 +670,55 @@ test('an arrangement renders through the Project surface on the running API, and
         },
         { timeout: 60_000 },
       )
-      .toBe(2);
-    clock.mark('arrange and split');
+      .toBe(3);
+    clock.mark('arrange, split and add');
 
     // Render it, through the same worker the editor uses, and wait for the file to be on show.
     await page.getByRole('button', { name: 'Render arrangement' }).click();
-    const caption = page.getByText(/^Rendered from 2 clips/u);
+    const caption = page.getByText(/^Rendered from 3 clips/u);
     await expect(caption).toBeVisible({ timeout: 120_000 });
     clock.mark('stitched render');
+    // The largest clip's frame, which is the portrait's; the 16:9 clip is fitted inside it.
     await expect(caption).toHaveText(/1080×1920/u);
     const player = page.getByLabel('Preview of Rendered arrangement');
     const renderedUrl = await player.evaluate((video: HTMLVideoElement) => video.src);
     expect(renderedUrl.startsWith('blob:')).toBe(true);
-    // The file itself, read with the page's own decoder: the frame the plan promised, with pixels.
-    const frame = await readRenderedFrameInk(
+    /*
+     * The file itself, read with the page's own decoder: the frame the plan promised, with pixels.
+     * In the portrait halves the clip is the frame — no bar above the picture, the fixture's own
+     * flat tone throughout. Inside the third clip a 1280x720 picture contained in 1080x1920 is
+     * 1080x607 high, so the top third of the frame is the bar — black — and the middle is the
+     * fixture's own flat colour, neither bright nor dark.
+     */
+    const bands = {
+      caption: { fromRatio: 0.4, toRatio: 0.6 },
+      control: { fromRatio: 0.02, toRatio: 0.3 },
+    } as const;
+    const firstFrame = await readRenderedFrameInk(page, renderedUrl, bands, DEFAULT_INK_THRESHOLDS);
+    expect(firstFrame.width).toBe(1_080);
+    expect(firstFrame.height).toBe(1_920);
+    expect(firstFrame.control.dark).toBe(0);
+    expect(firstFrame.control.bright).toBe(0);
+    const insideThird = await readRenderedFrameInk(
       page,
       renderedUrl,
-      { caption: { fromRatio: 0.55, toRatio: 1 }, control: { fromRatio: 0.02, toRatio: 0.45 } },
+      bands,
       DEFAULT_INK_THRESHOLDS,
+      (portraitMs + (totalMs - portraitMs) / 2) / 1_000,
     );
-    expect(frame.width).toBe(1_080);
-    expect(frame.height).toBe(1_920);
-    // The clip is the frame: no bar above the picture, and the fixture's own flat tone throughout.
-    expect(frame.control.dark).toBe(0);
-    expect(frame.control.bright).toBe(0);
+    expect(insideThird.control.dark / insideThird.control.pixels).toBeGreaterThan(0.98);
+    expect(insideThird.caption.dark / insideThird.caption.pixels).toBeLessThan(0.02);
+    expect(insideThird.caption.bright).toBe(0);
     const bytes = await page.evaluate(
       async (url) => (await (await fetch(url)).blob()).size,
       renderedUrl,
     );
     expect(bytes).toBeGreaterThan(0);
+    // And the surface says the same about that clip, from the render's own plan.
+    await strip.getByRole('option').nth(2).click();
+    await expect(
+      page.getByText("Shown with bars: its shape differs from the arrangement's 1080×1920 frame."),
+    ).toBeVisible();
     clock.mark('read back');
 
     // Nothing was written: the render is a preview, and the Project's cut is what it was.
