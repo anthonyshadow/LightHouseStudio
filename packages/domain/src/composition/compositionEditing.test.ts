@@ -24,8 +24,12 @@ import {
   setClipAudio,
   setClipTrim,
   splitCompositionAt,
+  appendSubtitleCue,
+  compositionSubtitlesAreFull,
+  removeSubtitleCue,
+  setSubtitleCue,
 } from './operations';
-import { VIDEO_EDIT_MINIMUM_TRIM_MS } from '../video-editing';
+import { SUBTITLE_CUE_LIMIT, VIDEO_EDIT_MINIMUM_TRIM_MS } from '../video-editing';
 
 const sourceAssetId = '79b94c02-d268-4201-a05b-1f3baa0caed1';
 const clipId = (index: number) => `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`;
@@ -180,6 +184,72 @@ describe('composition clip operations', () => {
     );
     expect(() => validateComposition(edited)).not.toThrow();
     expect(spans(edited)).toEqual(['500-3000', '1000-3500']);
+  });
+});
+
+describe('composition subtitle operations', () => {
+  const cue = (index: number, over: Partial<Composition['subtitles'][number]> = {}) => ({
+    id: cueId(index),
+    text: `Line ${index}`,
+    startMs: 1_000,
+    endMs: 3_000,
+    placement: 'bottom' as const,
+    ...over,
+  });
+
+  it('appends a cue and keeps the list in start order, whatever order they arrive in', () => {
+    const value = composition();
+    const appended = appendSubtitleCue(value, cue(2, { startMs: 100, endMs: 900 }));
+    expect(appended.subtitles.map(({ id }) => id)).toEqual([cueId(2), cueId(1)]);
+    expect(() => validateComposition(appended)).not.toThrow();
+  });
+
+  it('refuses a duplicate cue id, a cue with no id, and one past the limit', () => {
+    const value = composition();
+    expect(() => appendSubtitleCue(value, cue(1))).toThrow(CompositionRuleError);
+    expect(() => appendSubtitleCue(value, cue(2, { id: '' }))).toThrow(CompositionRuleError);
+    const full = {
+      ...value,
+      subtitles: Array.from({ length: SUBTITLE_CUE_LIMIT }, (_, index) =>
+        cue(index + 10, { startMs: index * 200, endMs: index * 200 + 150 }),
+      ),
+    };
+    expect(compositionSubtitlesAreFull(full)).toBe(true);
+    expect(compositionSubtitlesAreFull(value)).toBe(false);
+    // The normalizer slices at the cap in silence; the gesture refuses instead.
+    expect(() => appendSubtitleCue(full, cue(999))).toThrow(CompositionRuleError);
+  });
+
+  it('returns the same arrangement when an edit changes nothing, and normalizes when it does', () => {
+    const value = composition();
+    const held = value.subtitles[0]!;
+    expect(setSubtitleCue(value, held)).toBe(value);
+    const retyped = setSubtitleCue(value, { ...held, text: 'a\nb\nc\nd\ne' });
+    // Three lines is the cap the single-clip list is held to, and the cue half shares it.
+    expect(retyped.subtitles[0]?.text.split('\n')).toHaveLength(3);
+    expect(() => setSubtitleCue(value, cue(9))).toThrow(CompositionRuleError);
+  });
+
+  it('re-sorts when a cue is retimed past its neighbour', () => {
+    const two = appendSubtitleCue(composition(), cue(2, { startMs: 5_000, endMs: 6_000 }));
+    const moved = setSubtitleCue(two, { ...cue(2), startMs: 100, endMs: 900 });
+    expect(moved.subtitles.map(({ id }) => id)).toEqual([cueId(2), cueId(1)]);
+  });
+
+  it('removes a cue, leaves an arrangement with none, and is a no-op on a miss', () => {
+    const value = composition();
+    expect(removeSubtitleCue(value, cueId(1)).subtitles).toEqual([]);
+    // Unlike the last clip, the last cue does not un-arrange the Project.
+    expect(removeSubtitleCue(value, cueId(1)).clips).toHaveLength(2);
+    expect(removeSubtitleCue(value, cueId(9))).toBe(value);
+  });
+
+  it('tells a cue change from a no-op, so a gesture that moved nothing is not stored', () => {
+    const value = composition();
+    expect(compositionsEqual(value, setSubtitleCue(value, value.subtitles[0]!))).toBe(true);
+    expect(
+      compositionsEqual(value, setSubtitleCue(value, { ...value.subtitles[0]!, text: 'Other' })),
+    ).toBe(false);
   });
 });
 

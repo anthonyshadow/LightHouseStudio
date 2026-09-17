@@ -26,25 +26,32 @@ anything but the arrangement itself.
    so. The same video may be added more than once. A full arrangement refuses the split and the
    add with one notice that both controls point at. Undo and Redo step the arrangement back and
    forward through the same session.
-4. **Render arrangement** produces the stitched file on this device and plays it. It is disabled
+4. **Subtitles** opens a band between the playhead and the preview: a list of the arrangement's
+   cues and an editor for the selected one. **Add a subtitle at the playhead** mints one there,
+   already selected with its text selected, so the first keystroke replaces it — a cue carries text
+   from the moment it exists, because an arrangement's cues are autosaved and the contract refuses
+   an empty one. Clearing a cue's text deletes it. Each row says which clip the cue falls over,
+   since cues are in sequence time and may span a cut. Typing is one change and one undo entry per
+   focus, as a slider drag is.
+5. **Render arrangement** produces the stitched file on this device and plays it. It is disabled
    until the browser has shown it can encode, with a notice when it cannot, and refused with a
    reason while any clip stands over media the Project can no longer open. An archived Project can
    still render: a render writes nothing.
-5. While rendering, a status region shows the phase, the percentage and — once the render has
+6. While rendering, a status region shows the phase, the percentage and — once the render has
    decided it — the frame and sound it is rendering at. Every gesture is disabled, Undo and Redo
    included, so nothing changes under the render. **Cancel render** stops it; leaving the surface
    cancels it too, and the notice says so. Route exit, the browser's leave prompt and logout treat
    the render as they treat the single-clip editor's.
-6. The rendered file is validated against the plan — its frame, its length, its sound — before it
+7. The rendered file is validated against the plan — its frame, its length, its sound — before it
    is shown, then plays in the product's one video player with a caption naming the clip count, the
    length and the frame, and saying plainly that it is exactly what the arrangement produces and
    that it is kept nowhere. **Render again** and **Back to editing** are always there. A gesture
    after the render leaves the file playable and marks it out of date.
-7. The selected clip's inspector says what the render did to it, from the render's own plan:
+8. The selected clip's inspector says what the render did to it, from the render's own plan:
    scaled to the frame, shown with bars, its sound resampled or folded, or silent — because it is
    muted or has no sound. When the clips' own sound format could not be encoded, a notice names the
    format the file carries instead.
-8. A render that fails says why in words the worker chose for the operator — a clip whose video or
+9. A render that fails says why in words the worker chose for the operator — a clip whose video or
    sound this browser cannot decode is named, with the way out — and that nothing in the Project
    changed, with **Try again** and **Dismiss**.
 

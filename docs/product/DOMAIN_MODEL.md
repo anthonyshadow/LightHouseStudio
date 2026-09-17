@@ -137,7 +137,9 @@ clip does not copy bytes; splitting a clip creates two references.
 _Status: modelled in snapshot v3 (`CompositionClip`: id, media reference, trim, audio level).
 The arrangement editor makes them — the first over the current cut, the rest by splitting or by
 **Add a clip**, which takes the whole of any source the Project holds or of the cut it currently
-works from — and the stitched render draws each into the arrangement's one frame._
+works from — and the stitched render draws each into the arrangement's one frame. Its subtitle list
+is written by the arrangement's own Subtitles band since 2026-09-16, in sequence time, so a cue may
+span a cut._
 
 ### Subtitle track / subtitle cue
 

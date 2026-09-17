@@ -1,11 +1,11 @@
 import { requireOpaqueId } from '../common/identity';
-import type { VideoEditAudio } from '../video-editing/types';
+import type { SubtitleCue, VideoEditAudio } from '../video-editing/types';
 import {
   DEFAULT_VIDEO_EDIT_AUDIO,
   VIDEO_EDIT_MINIMUM_TRIM_MS,
   normalizeVideoEditAudio,
 } from '../video-editing/rules';
-import { subtitleCuesEqual } from '../video-editing/subtitles';
+import { SUBTITLE_CUE_LIMIT, subtitleCuesEqual } from '../video-editing/subtitles';
 import { failComposition, normalizeComposition } from './rules';
 import { projectMediaReferencesEqual } from '../projects/relations';
 import type { ProjectMediaReference } from '../projects/media-reference';
@@ -212,6 +212,65 @@ export const splitCompositionAt = (
     fail('Each composition clip needs its own identifier.');
   }
   return withClips(composition, composition.clips.toSpliced(placement.index, 1, left, right));
+};
+
+/**
+ * The cue half's `withClips`: every subtitle change goes through the same normalizer, which caps
+ * the text, sorts by start then id, and de-duplicates. It deliberately does not clamp a cue to the
+ * sequence — shortening a clip must not truncate every cue after it.
+ */
+const withSubtitles = (composition: Composition, subtitles: readonly SubtitleCue[]): Composition =>
+  normalizeComposition({ ...composition, subtitles });
+
+/**
+ * Whether one more cue would take the arrangement past its limit.
+ *
+ * Asked before the control is offered, the way {@link compositionIsFull} is, and for a sharper
+ * reason: `normalizeSubtitleCues` silently slices at the cap, so an add past it would vanish
+ * rather than refuse.
+ */
+export const compositionSubtitlesAreFull = (composition: Composition): boolean =>
+  composition.subtitles.length >= SUBTITLE_CUE_LIMIT;
+
+export const appendSubtitleCue = (composition: Composition, cue: SubtitleCue): Composition => {
+  if (compositionSubtitlesAreFull(composition)) {
+    fail(`A composition holds at most ${SUBTITLE_CUE_LIMIT} subtitles.`);
+  }
+  requireOpaqueId(cue.id, 'Composition subtitle', fail);
+  if (composition.subtitles.some((held) => held.id === cue.id)) {
+    fail('Each composition subtitle needs its own identifier.');
+  }
+  return withSubtitles(composition, [...composition.subtitles, cue]);
+};
+
+/**
+ * One cue replaced by its edited self. Compares every field rather than trusting identity, because
+ * the normalizer returns a new object whenever it changes the text at all.
+ */
+export const setSubtitleCue = (composition: Composition, cue: SubtitleCue): Composition => {
+  const index = composition.subtitles.findIndex((held) => held.id === cue.id);
+  if (index === -1) fail('That subtitle is not part of this arrangement.');
+  const held = composition.subtitles[index]!;
+  if (
+    held.text === cue.text &&
+    held.startMs === cue.startMs &&
+    held.endMs === cue.endMs &&
+    held.placement === cue.placement
+  ) {
+    return composition;
+  }
+  return withSubtitles(composition, composition.subtitles.with(index, cue));
+};
+
+/**
+ * The arrangement without one cue. Never `null`, unlike {@link removeClip}: an arrangement with no
+ * subtitles is still an arrangement.
+ */
+export const removeSubtitleCue = (composition: Composition, cueId: string): Composition => {
+  const subtitles = composition.subtitles.filter((held) => held.id !== cueId);
+  return subtitles.length === composition.subtitles.length
+    ? composition
+    : withSubtitles(composition, subtitles);
 };
 
 /** Whether two arrangements say the same thing, so a gesture that changed nothing is not stored. */

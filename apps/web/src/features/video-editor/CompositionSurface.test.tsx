@@ -554,6 +554,65 @@ describe('CompositionSurface', () => {
     ).toBeVisible();
   });
 
+  it('authors a subtitle over the sequence, at the playhead, opened for typing', () => {
+    const { session } = renderSurface();
+    fireEvent.change(screen.getByRole('slider', { name: 'Playhead' }), {
+      target: { value: '3000' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Subtitles' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add a subtitle at the playhead' }));
+
+    const [cue] = session.staged()?.subtitles ?? [];
+    // Minted with text: the wire refuses an empty cue, and these are autosaved on the spot.
+    expect(cue).toMatchObject({ text: 'New subtitle', startMs: 3_000, placement: 'bottom' });
+    // The default length the domain gives a cue, not a number this surface invented.
+    expect(cue!.endMs).toBe(5_000);
+    expect(screen.getByLabelText('Text')).toHaveValue('New subtitle');
+    // The row says where it lands, because a bare time range over several clips says nothing.
+    expect(screen.getByText('Over clip 1 and on')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Subtitles (1)' })).toBeVisible();
+  });
+
+  it('deletes a subtitle whose text is cleared, rather than staging one the wire refuses', () => {
+    const { session } = renderSurface();
+    fireEvent.click(screen.getByRole('button', { name: 'Subtitles' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add a subtitle at the playhead' }));
+    expect(session.staged()?.subtitles).toHaveLength(1);
+
+    const text = screen.getByLabelText('Text');
+    fireEvent.focus(text);
+    fireEvent.change(text, { target: { value: '   ' } });
+    fireEvent.blur(text);
+
+    expect(session.staged()?.subtitles).toEqual([]);
+    expect(screen.getByRole('button', { name: 'Subtitles' })).toBeVisible();
+  });
+
+  it('stages one change for a whole typed sentence, not one per keystroke', () => {
+    const { session } = renderSurface();
+    fireEvent.click(screen.getByRole('button', { name: 'Subtitles' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add a subtitle at the playhead' }));
+    const afterAdd = session.propose.mock.calls.length;
+
+    const text = screen.getByLabelText('Text');
+    fireEvent.focus(text);
+    for (const value of ['O', 'On', 'One ', 'One t', 'One two']) {
+      fireEvent.change(text, { target: { value } });
+    }
+    // Nothing staged mid-gesture: the proposal's own trim would eat the space between words.
+    expect(session.propose.mock.calls.length).toBe(afterAdd);
+    fireEvent.blur(text);
+    expect(session.propose.mock.calls.length).toBe(afterAdd + 1);
+    expect(session.staged()?.subtitles[0]?.text).toBe('One two');
+  });
+
+  it('closes every subtitle gesture on an archived Project', () => {
+    renderSurface(composition(), { archived: true });
+    // Looking is allowed; changing is not.
+    fireEvent.click(screen.getByRole('button', { name: 'Subtitles' }));
+    expect(screen.getByRole('button', { name: 'Add a subtitle at the playhead' })).toBeDisabled();
+  });
+
   it('says whether the arrangement is saved, where the masthead that normally says it is hidden', () => {
     renderSurface();
     expect(document.querySelector('[data-composition-save-status]')).toHaveTextContent(

@@ -1,10 +1,12 @@
 import type { ProjectCurrentResponse } from '@studio/contracts';
 import {
   VIDEO_EDIT_HISTORY_LIMIT,
+  createSubtitleCueAt,
   compositionPlacements,
   type Composition,
   type CompositionPlacement,
   type ProjectMediaReference,
+  type SubtitleCue,
   type VideoEditAudio,
 } from '@studio/domain';
 import {
@@ -20,9 +22,16 @@ import {
   setClipTrim,
   splitCompositionAt,
   type CompositionSplitRefusal,
+  appendSubtitleCue,
+  compositionSubtitlesAreFull,
+  removeSubtitleCue,
+  setSubtitleCue,
 } from '@studio/domain/composition';
 import { useCallback, useMemo, useState } from 'react';
 import type { ProjectSessionPort } from '../projects/useProjectSession';
+
+/** What a new cue says until the operator types over it; the wire refuses an empty one. */
+const NEW_SUBTITLE_TEXT = 'New subtitle';
 
 interface CompositionHistory {
   readonly past: readonly (Composition | null)[];
@@ -53,6 +62,7 @@ export const useCompositionSession = (
 ) => {
   const [history, setHistory] = useState<CompositionHistory>(EMPTY_HISTORY);
   const [selectedClipId, setSelectedClipId] = useState<string | null>(null);
+  const [selectedCueId, setSelectedCueId] = useState<string | null>(null);
   const [playheadMs, setPlayheadMs] = useState(0);
   /**
    * A continuous gesture in flight — a slider being dragged — with the arrangement it started from.
@@ -202,6 +212,72 @@ export const useCompositionSession = (
     [createId, durationMs, edit],
   );
 
+  const selectedCue = useMemo(
+    () => composition?.subtitles.find(({ id }) => id === selectedCueId) ?? null,
+    [composition, selectedCueId],
+  );
+
+  /**
+   * A subtitle over the sequence, starting at the playhead.
+   *
+   * Minted with text, unlike the single clip's, because the wire refuses an empty cue and these are
+   * autosaved the moment they are staged — so the single-clip gesture of adding a blank cue and
+   * typing into it cannot be copied. The surface selects it and selects its text, so the first
+   * keystroke replaces the placeholder.
+   */
+  const addCue = useCallback((): string | null => {
+    if (composition === null) return null;
+    const cue = {
+      ...createSubtitleCueAt({ trim: { startMs: 0, endMs: durationMs } }, playheadMs, createId()),
+      text: NEW_SUBTITLE_TEXT,
+    };
+    if (!edit((held) => appendSubtitleCue(held, cue))) return null;
+    setSelectedCueId(cue.id);
+    return cue.id;
+  }, [composition, createId, durationMs, edit, playheadMs]);
+
+  /** One cue replaced: staged at once outside a gesture, previewed inside one. */
+  const applyCue = useCallback(
+    (cue: SubtitleCue) => edit((held) => setSubtitleCue(held, cue)),
+    [edit],
+  );
+
+  const removeCue = useCallback(
+    (cueId: string) => {
+      const removed = edit((held) => removeSubtitleCue(held, cueId));
+      if (removed && cueId === selectedCueId) setSelectedCueId(null);
+      return removed;
+    },
+    [edit, selectedCueId],
+  );
+
+  /**
+   * Closes a cue's typing transaction: the text trimmed, and the cue gone if nothing is left of it.
+   *
+   * Deliberately not `endGesture`. The wire refuses empty cue text, so staging a cleared cue would
+   * propose something the session rejects — into an error this surface would have to explain. The
+   * single-clip editor answers the same question at its finalize step ("no cue that says nothing");
+   * a composition never finalizes, so the answer belongs here.
+   */
+  const commitCue = useCallback(
+    (cueId: string) => {
+      const open = gesture;
+      setGesture(null);
+      if (open === null) return;
+      const held = open.value.subtitles.find((cue) => cue.id === cueId) ?? null;
+      const text = held === null ? '' : held.text.trim();
+      const settled =
+        held === null
+          ? open.value
+          : text === ''
+            ? removeSubtitleCue(open.value, cueId)
+            : setSubtitleCue(open.value, { ...held, text });
+      if (text === '' && cueId === selectedCueId) setSelectedCueId(null);
+      if (!compositionsEqual(settled, open.start)) stage(settled, open.start);
+    },
+    [gesture, selectedCueId, stage],
+  );
+
   const move = useCallback(
     (clipId: string, toIndex: number) => edit((held) => moveClip(held, clipId, toIndex)),
     [edit],
@@ -274,6 +350,13 @@ export const useCompositionSession = (
     split,
     arrange,
     add,
+    selectedCue,
+    selectCue: setSelectedCueId,
+    cuesAtLimit: composition !== null && compositionSubtitlesAreFull(composition),
+    addCue,
+    applyCue,
+    commitCue,
+    removeCue,
     // Asked before the add is offered, the way the split's refusal is: a full arrangement gets a
     // disabled control with its reason, not a press that fails.
     atLimit: composition !== null && compositionIsFull(composition),

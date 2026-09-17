@@ -675,6 +675,37 @@ test('a mixed arrangement renders through the Project surface on the running API
       .toBe(3);
     clock.mark('arrange, split and add');
 
+    /*
+     * A caption over the cut between two different videos — the arrangement's own subtitle list, in
+     * sequence time. The cut of a split is not the test: burned pixels from one already-captioned
+     * cut would appear to cross it. This one starts before the third clip and runs into it.
+     */
+    await page.getByRole('slider', { name: 'Playhead' }).fill(String(portraitMs - 300));
+    await page.getByRole('button', { name: 'Subtitles' }).click();
+    await page.getByRole('button', { name: 'Add a subtitle at the playhead' }).click();
+    const cueText = page.getByLabel('Text');
+    await cueText.fill('ACROSS THE CUT');
+    await cueText.blur();
+    await expect(page.getByRole('button', { name: 'Subtitles (1)' })).toBeVisible();
+    await expect
+      .poll(
+        async () => {
+          const project = await page.request.get(`/api/projects/${projectId}`);
+          if (!project.ok()) return null;
+          const body = (await project.json()) as {
+            readonly revision?: {
+              readonly snapshot?: {
+                readonly composition?: { readonly subtitles: { text: string }[] } | null;
+              };
+            };
+          };
+          return body.revision?.snapshot?.composition?.subtitles[0]?.text ?? null;
+        },
+        { timeout: 60_000 },
+      )
+      .toBe('ACROSS THE CUT');
+    clock.mark('caption across the cut');
+
     // Render it, through the same worker the editor uses, and wait for the file to be on show.
     await page.getByRole('button', { name: 'Render arrangement' }).click();
     const caption = page.getByText(/^Rendered from 3 clips/u);
@@ -716,6 +747,28 @@ test('a mixed arrangement renders through the Project surface on the running API
       renderedUrl,
     );
     expect(bytes).toBeGreaterThan(0);
+
+    // The caption is burned on both sides of the cut, which is what sequence time buys.
+    const captionBands = {
+      caption: { fromRatio: 0.6, toRatio: 0.85 },
+      control: { fromRatio: 0.02, toRatio: 0.3 },
+    } as const;
+    const beforeCut = await readRenderedFrameInk(
+      page,
+      renderedUrl,
+      captionBands,
+      DEFAULT_INK_THRESHOLDS,
+      (portraitMs - 150) / 1_000,
+    );
+    const afterCut = await readRenderedFrameInk(
+      page,
+      renderedUrl,
+      captionBands,
+      DEFAULT_INK_THRESHOLDS,
+      (portraitMs + 150) / 1_000,
+    );
+    expect(beforeCut.caption.bright).toBeGreaterThan(0);
+    expect(afterCut.caption.bright).toBeGreaterThan(0);
     // And the surface says the same about that clip, from the render's own plan.
     await strip.getByRole('option').nth(2).click();
     await expect(

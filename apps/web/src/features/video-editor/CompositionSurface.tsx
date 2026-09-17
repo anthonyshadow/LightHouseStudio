@@ -32,6 +32,7 @@ import type { ProjectSessionPort } from '../projects/useProjectSession';
 import { VideoPlayer } from '../video-player/VideoPlayer';
 import { CompositionClipPicker } from './CompositionClipPicker';
 import { EditRange } from './EditRange';
+import { SubtitleCueEditor } from './SubtitleCueEditor';
 import {
   clipStripCaptionStyles,
   clipStripStyles,
@@ -39,6 +40,7 @@ import {
   compositionInspectorStyles,
   compositionLayoutStyles,
   compositionPreviewStyles,
+  compositionSubtitlesStyles,
   compositionSurfaceStyles,
 } from './CompositionSurface.styles';
 import { formatVideoEditTimelineTime } from './types';
@@ -217,6 +219,12 @@ export const CompositionSurface = ({
     arrange,
     add,
     atLimit,
+    selectedCue,
+    selectCue,
+    addCue,
+    applyCue,
+    commitCue,
+    removeCue,
     beginGesture,
     endGesture,
     move,
@@ -249,6 +257,7 @@ export const CompositionSurface = ({
   const { announcement, announce } = useAnnouncement();
   const [playbackFailed, setPlaybackFailed] = useState(false);
   const [pickingClip, setPickingClip] = useState(false);
+  const [subtitlesOpen, setSubtitlesOpen] = useState(false);
   /**
    * What the last choice from the picker did, held until the panel has gone.
    *
@@ -374,6 +383,24 @@ export const CompositionSurface = ({
       video.currentTime = seconds;
     }
   }, [playheadMs, selectedClip, selectedMedia]);
+
+  /**
+   * Which clip a cue lands on, so a bare time range on a six-clip arrangement means something.
+   *
+   * Read off the placements the surface already has rather than asking the domain per cue: that
+   * question rebuilds the whole prefix sum each time, and this runs for every cue on every render.
+   */
+  const cueLocation = useCallback(
+    (cue: { readonly startMs: number; readonly endMs: number }): string | null => {
+      if (cue.startMs >= durationMs) return 'After the end of the arrangement';
+      const at = placements.find((placement) => cue.startMs < placement.endMs) ?? null;
+      if (at === null) return null;
+      return cue.endMs > at.endMs
+        ? `Over clip ${at.index + 1} and on`
+        : `Over clip ${at.index + 1}`;
+    },
+    [durationMs, placements],
+  );
 
   const startRender = useCallback(() => {
     if (arrangement === null || rendering) return;
@@ -673,6 +700,15 @@ export const CompositionSurface = ({
         >
           Add a clip
         </Button>
+        <Button
+          aria-expanded={subtitlesOpen}
+          aria-controls="composition-subtitles"
+          onClick={() => setSubtitlesOpen((open) => !open)}
+        >
+          {arrangement.subtitles.length === 0
+            ? 'Subtitles'
+            : `Subtitles (${arrangement.subtitles.length})`}
+        </Button>
         <Button variant="quiet" disabled={!canUndo || blocked} onClick={undo}>
           Undo
         </Button>
@@ -761,6 +797,36 @@ export const CompositionSurface = ({
         onChange={seek}
         onCommit={() => undefined}
       />
+
+      {subtitlesOpen ? (
+        <section
+          id="composition-subtitles"
+          css={compositionSubtitlesStyles(theme)}
+          aria-labelledby="composition-subtitles-heading"
+        >
+          <h3 id="composition-subtitles-heading">Subtitles</h3>
+          <SubtitleCueEditor
+            cues={arrangement.subtitles}
+            selectedCueId={selectedCue?.id ?? null}
+            timelineDurationMs={durationMs}
+            playheadMs={playheadMs}
+            disabled={blocked}
+            addLabel="Add a subtitle at the playhead"
+            emptyNotice="No subtitles yet. Move the playhead to where the first line should appear, then add one. Subtitles run across the cuts and are burned into the render."
+            describeCue={cueLocation}
+            onAdd={addCue}
+            onSelectCue={(cue) => {
+              selectCue(cue.id);
+              seek(cue.startMs);
+            }}
+            onPreviewCue={applyCue}
+            onApplyCue={applyCue}
+            onBeginEdit={beginGesture}
+            onCommitEdit={commitCue}
+            onRemoveCue={removeCue}
+          />
+        </section>
+      ) : null}
 
       <div css={compositionLayoutStyles(theme)}>
         <div css={compositionPreviewStyles(theme)}>{preview}</div>

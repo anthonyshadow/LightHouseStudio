@@ -27,6 +27,33 @@ export const compositionSurfaceStyles = (theme: Theme): CSSObject => ({
   '& > *': { flexShrink: 0 },
 });
 
+/**
+ * The Subtitles band: full width, between the playhead and the two-column grid.
+ *
+ * Not in the inspector column, which is about the selected *clip* — a cue is about the sequence,
+ * and a text area, two sliders and a three-way control do not fit a 16rem column any better than
+ * the clip strip would. The list keeps its own scrollport so the band does not grow with the cue
+ * count and push the preview off the surface.
+ */
+export const compositionSubtitlesStyles = (theme: Theme): CSSObject => ({
+  display: 'flex',
+  flexDirection: 'column',
+  gap: theme.space.sm,
+  minWidth: 0,
+  padding: theme.space.sm,
+  border: `1px solid ${theme.colors.border}`,
+  borderRadius: theme.radii.medium,
+  background: theme.colors.surfaceSoft,
+  '& > h3': { margin: 0, fontSize: theme.fontSizes.body },
+  '& > ol': {
+    maxHeight: '24rem',
+    overflowY: 'auto',
+    overscrollBehavior: 'contain',
+    scrollbarWidth: 'thin',
+  },
+  [media.down('tablet')]: { '& > ol': { maxHeight: '16rem' } },
+});
+
 export const compositionLayoutStyles = (theme: Theme): CSSObject => ({
   display: 'grid',
   // The preview takes the room; the inspector is a column beside it and a row under it when the
