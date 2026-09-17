@@ -1071,12 +1071,6 @@ const statesEveryDefaultedField = (value: unknown, context: z.RefinementCtx): vo
   }
 };
 
-/** The same requirement where a specification is mandatory rather than nullable. */
-const requiredCueVideoEditSpecSchema = z
-  .unknown()
-  .superRefine(statesEveryDefaultedField)
-  .pipe(projectVideoEditSpecSchema);
-
 const proposedVideoEditSpecSchema = z
   .unknown()
   .superRefine(statesEveryDefaultedField)
@@ -1201,14 +1195,39 @@ export const removeProjectSourceRequestSchema = z
   })
   .strict();
 
+/**
+ * An on-device render the browser is handing back as the Project's cut.
+ *
+ * `kind` says what made the bytes, and decides whether an edit specification describes them. A
+ * single-clip render carries one and always has; a stitched arrangement has no single-clip spec to
+ * carry, and fabricating one would misdescribe the file — so the two are tied rather than both
+ * loosened, and neither can be sent without the other agreeing.
+ */
 export const projectWorkingMediaUploadMetadataSchema = z
   .object({
     expectedVersion: z.number().int().positive(),
     expectedRevisionNumber: z.number().int().positive(),
     filename: z.string().trim().min(1).max(180),
-    localEdit: requiredCueVideoEditSpecSchema,
+    kind: z.enum(['local-render', 'stitched-render']).default('local-render'),
+    localEdit: proposedVideoEditSpecSchema,
   })
-  .strict();
+  .strict()
+  .superRefine((value, context) => {
+    if (value.kind === 'local-render' && value.localEdit === null) {
+      context.addIssue({
+        code: 'custom',
+        path: ['localEdit'],
+        message: 'A single-clip render states the edit its pixels already carry.',
+      });
+    }
+    if (value.kind === 'stitched-render' && value.localEdit !== null) {
+      context.addIssue({
+        code: 'custom',
+        path: ['localEdit'],
+        message: 'A stitched arrangement carries no single-clip edit.',
+      });
+    }
+  });
 
 export const adoptProjectWorkingMediaRequestSchema = z
   .object({
@@ -1327,9 +1346,32 @@ export const projectRenditionUploadResponseSchema = z
   })
   .strict();
 
+/**
+ * Where a Project's current cut came from.
+ *
+ * A runtime list because the value is constrained in five places that TypeScript cannot see into:
+ * two Zod enums, a Postgres check constraint, a raw SQL predicate that decides which adoption *is*
+ * the current cut, and the api-side type. One of them drifting used to be invisible until a read
+ * returned nothing, in Postgres only.
+ */
+export const PROJECT_WORKING_MEDIA_KINDS = [
+  'local-render',
+  'media-asset',
+  'saved-video-version',
+  'stitched-render',
+] as const;
+
+/**
+ * The kinds whose bytes are a Project asset rather than a borrowed Library Version. The predicate
+ * that matches an adoption to the snapshot's `workingMedia` reads this list.
+ */
+export const PROJECT_WORKING_MEDIA_ASSET_KINDS = PROJECT_WORKING_MEDIA_KINDS.filter(
+  (kind) => kind !== 'saved-video-version',
+);
+
 const projectWorkingMediaSchema = z
   .object({
-    kind: z.enum(['local-render', 'media-asset', 'saved-video-version']),
+    kind: z.enum(PROJECT_WORKING_MEDIA_KINDS),
     reference: projectMediaReferenceSchema,
     assetId: z.uuid(),
     savedVideoId: z.uuid().nullable(),

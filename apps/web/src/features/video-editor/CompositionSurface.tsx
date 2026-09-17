@@ -5,10 +5,9 @@ import {
   VIDEO_EDIT_AUDIO_LEVEL_MAX,
   VIDEO_EDIT_MINIMUM_TRIM_MS,
   clipMediaMsAt,
-  compositionsEqual,
   type CompositionPlacement,
-  type CompositionSplitRefusal,
 } from '@studio/domain';
+import { compositionsEqual, type CompositionSplitRefusal } from '@studio/domain/composition';
 import {
   useCallback,
   useEffect,
@@ -21,6 +20,7 @@ import {
 import { Button, StatusNotice, VisuallyHidden } from '../../ui';
 import { AnnouncementRegion, useAnnouncement } from '../../ui/primitives/announcement';
 import { ProjectSessionNotice, projectWorkspaceSaveStatus } from '../projects/projectSaveStatus';
+import { useProjectCompositionAdoption } from '../projects/useProjectCompositionAdoption';
 import {
   clipMediaOf,
   type ProjectClipMedia,
@@ -231,6 +231,8 @@ export const CompositionSurface = ({
   // Asked only once there is something to render: the probe encodes a frame to answer.
   const supported = useVideoEditExportSupport(arrangement !== null);
   const render = useCompositionRender();
+  const adoption = useProjectCompositionAdoption(session);
+  const keeping = adoption.phase === 'saving';
   const rendering = render.phase === 'rendering' || render.phase === 'validating';
   // Hoisted above the rows: Emotion serialises each of these on every call and the strip runs to
   // `COMPOSITION_CLIP_LIMIT`, so a selected boolean is two objects rather than one per clip.
@@ -497,12 +499,17 @@ export const CompositionSurface = ({
           onError={() => setPlaybackFailed(true)}
         />
         <small>
-          {`Rendered from ${ready.renderedFrom.clips.length} ${ready.renderedFrom.clips.length === 1 ? 'clip' : 'clips'} · ${formatVideoEditTimelineTime(ready.plan.durationMs)} · ${frameLabel(ready.plan)}. This is exactly what the arrangement produces. The file is not kept anywhere; saving an arrangement comes next.`}
+          {`Rendered from ${ready.renderedFrom.clips.length} ${ready.renderedFrom.clips.length === 1 ? 'clip' : 'clips'} · ${formatVideoEditTimelineTime(ready.plan.durationMs)} · ${frameLabel(ready.plan)}. This is exactly what the arrangement produces. Keep it as the current cut and the Project's Save step delivers this file.`}
         </small>
         {stale ? (
-          <StatusNotice role="status" tone="warning" title="Arrangement changed">
+          <StatusNotice
+            id="composition-stale-reason"
+            role="status"
+            tone="warning"
+            title="Arrangement changed"
+          >
             This preview was rendered before your last change. Render again to see the arrangement
-            as it is now.
+            as it is now, and to keep it as the current cut.
           </StatusNotice>
         ) : null}
         {playbackFailed ? (
@@ -510,11 +517,42 @@ export const CompositionSurface = ({
             This browser could not play the rendered file. Render again, or try another browser.
           </StatusNotice>
         ) : null}
+        {adoption.phase === 'saved' ? (
+          <StatusNotice role="status" tone="success" title="This is now the current cut">
+            The Project works from this file, and Save will deliver it. Your arrangement is still
+            here: change it and keep it again, and this cut does not follow those edits until you
+            do. Nothing was saved to your videos.
+          </StatusNotice>
+        ) : null}
+        {adoption.phase === 'error' && adoption.message !== null ? (
+          <StatusNotice role="alert" tone="danger" title="Not kept">
+            {adoption.message}
+            <div css={captionCss}>
+              <Button size="small" variant="quiet" onClick={adoption.dismiss}>
+                Dismiss
+              </Button>
+            </div>
+          </StatusNotice>
+        ) : null}
         <div css={captionCss}>
-          <Button variant="primary" disabled={!canRender} onClick={startRender}>
+          <Button
+            variant="primary"
+            disabled={stale || archived || keeping || adoption.phase === 'saved'}
+            aria-describedby={stale ? 'composition-stale-reason' : undefined}
+            onClick={() => {
+              void adoption.adopt({
+                file: ready.file,
+                plan: ready.plan,
+                renderedFrom: ready.renderedFrom,
+              });
+            }}
+          >
+            {keeping ? 'Keeping…' : 'Keep as the current cut'}
+          </Button>
+          <Button variant="primary" disabled={!canRender || keeping} onClick={startRender}>
             Render again
           </Button>
-          <Button variant="quiet" onClick={render.discard}>
+          <Button variant="quiet" disabled={keeping} onClick={render.discard}>
             Back to editing
           </Button>
         </div>

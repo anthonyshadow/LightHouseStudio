@@ -82,7 +82,15 @@ export const CompositionClipPicker = ({
     }
     return counts;
   }, [composition.clips]);
-  const entries = useMemo(() => [...media.entries()], [media]);
+  /*
+   * Never the Project's own derived cut. Once a stitched arrangement is the current cut it is in
+   * the catalogue like anything else, and adding it to the arrangement it came from would nest one
+   * render inside the next.
+   */
+  const entries = useMemo(
+    () => [...media.entries()].filter(([, entry]) => !entry.derived),
+    [media],
+  );
 
   /*
    * One arm per state, above the panel rather than as a ternary chain inside it — the shape the

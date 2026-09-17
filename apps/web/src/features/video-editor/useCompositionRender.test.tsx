@@ -81,7 +81,10 @@ const revokeObjectURL = vi.fn();
 
 beforeEach(() => {
   renderComposition.mockReset();
-  validateEditedVideoOutput.mockReset().mockResolvedValue({});
+  // The validator builds the adoptable file; the hook keeps it so the Project can be given it.
+  validateEditedVideoOutput
+    .mockReset()
+    .mockResolvedValue({ file: new File(['mp4'], 'arrangement.mp4', { type: 'video/mp4' }) });
   createObjectURL.mockClear();
   revokeObjectURL.mockClear();
   Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectURL });

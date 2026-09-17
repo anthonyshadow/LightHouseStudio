@@ -859,7 +859,8 @@ describe('ProjectOutputService local composite authority', () => {
       now: () => new Date('2026-08-13T12:01:30.000Z'),
       inspect: () => Promise.resolve(inspected),
       projectRetention: projects,
-    }).uploadLocalRender({
+    }).uploadOnDeviceRender({
+      kind: 'local-render' as const,
       ownerUserId,
       projectId,
       operationKey: renderKey,

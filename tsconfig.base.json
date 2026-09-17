@@ -16,6 +16,7 @@
     "skipLibCheck": true,
     "paths": {
       "@studio/domain": ["./packages/domain/src/index.ts"],
+      "@studio/domain/composition": ["./packages/domain/src/composition/operations.ts"],
       "@studio/contracts": ["./packages/contracts/src/index.ts"]
     }
   }

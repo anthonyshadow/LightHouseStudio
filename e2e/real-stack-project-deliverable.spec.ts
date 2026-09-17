@@ -723,9 +723,61 @@ test('a mixed arrangement renders through the Project surface on the running API
     ).toBeVisible();
     clock.mark('read back');
 
-    // Nothing was written: the render is a preview, and the Project's cut is what it was.
-    const workingMedia = await page.request.get(`/api/projects/${projectId}/working-media`);
-    expect(workingMedia.status()).toBe(404);
+    // Until it is kept, nothing is written: the render is a preview.
+    const beforeKeeping = await page.request.get(`/api/projects/${projectId}/working-media`);
+    expect(beforeKeeping.status()).toBe(404);
+
+    /*
+     * Keep it, and the Project works from the stitched file. This is the measurement the
+     * prompt-35 gate made the other way round: it saved a 2.00 s arrangement and got a 1,000 ms
+     * video, because Save never saw the arrangement. It sees it now, by way of the cut.
+     */
+    await page.getByRole('button', { name: 'Keep as the current cut' }).click();
+    await expect(page.getByText('This is now the current cut')).toBeVisible({ timeout: 60_000 });
+    const kept = await page.request.get(`/api/projects/${projectId}/working-media`);
+    expect(kept.ok(), await kept.text()).toBe(true);
+    const keptMedia = (await kept.json()) as {
+      readonly media: {
+        readonly kind: string;
+        readonly durationMs: number;
+        readonly width: number;
+      };
+    };
+    expect(keptMedia.media.kind).toBe('stitched-render');
+    expect(keptMedia.media.width).toBe(1_080);
+    expect(Math.abs(keptMedia.media.durationMs - totalMs)).toBeLessThan(500);
+    // The arrangement survives being kept, so it can be changed and kept again.
+    await expect(strip.getByRole('option')).toHaveCount(3);
+    clock.mark('keep as current cut');
+
+    // And Save now delivers it: one whole arrangement, not one of its sources.
+    await page.getByRole('button', { name: 'Back to the Project' }).click();
+    await openProjectTask(page, 'Save');
+    await page.getByRole('button', { name: /^Save video ·/u }).click();
+    const destination = page.getByRole('form', { name: 'Save destination' });
+    await destination.getByLabel('Video title').fill(residue.title);
+    await page.getByRole('button', { name: 'Save video · New video' }).click();
+    await expect(page.getByText(new RegExp(`^Saved “${residue.title}”`, 'u'))).toBeVisible({
+      timeout: 180_000,
+    });
+    const saved = await page.request.get(
+      `/api/videos?search=${encodeURIComponent(residue.title)}&pageSize=10`,
+    );
+    const savedBody = (await saved.json()) as {
+      readonly videos?: readonly {
+        readonly id: string;
+        readonly title: string;
+        readonly currentVersion: { durationMs: number; width: number; height: number };
+      }[];
+    };
+    const deliverable = (savedBody.videos ?? []).find(({ title }) => title === residue.title);
+    expect(deliverable, 'the arrangement was saved as a Video').toBeDefined();
+    residue.savedVideoId = deliverable!.id;
+    expect(deliverable!.currentVersion.width).toBe(1_080);
+    expect(deliverable!.currentVersion.height).toBe(1_920);
+    // The whole arrangement's length, not one clip's source.
+    expect(Math.abs(deliverable!.currentVersion.durationMs - totalMs)).toBeLessThan(500);
+    clock.mark('save the arrangement');
 
     expect(blocked.requests).toEqual([]);
     expect(blocked.webSockets).toEqual([]);

@@ -112,6 +112,7 @@ export const useProjectWorkingMediaController = (
           operationKey,
           expectedVersion: current.project.version,
           expectedRevisionNumber: current.project.currentRevisionNumber,
+          kind: 'local-render',
           localEdit: candidate.spec,
           signal: controller.signal,
         });

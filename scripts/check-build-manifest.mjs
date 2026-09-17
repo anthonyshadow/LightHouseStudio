@@ -143,6 +143,22 @@ export const BUILD_CLOSURE_BUDGETS = {
   // sentence audible — is *not* exported from the `ui` barrel, because only lazily loaded surfaces
   // announce anything and the shell imports that barrel. Reached by its path, the way `Skeleton`
   // and `LoadingPlaceholder` are, it costs this closure nothing; exported, it cost 852 bytes.
+  //
+  // The barrel edge above is closed as of 2026-09-16, and the recovery it promised is real:
+  // `composition/index.ts` no longer re-exports `./operations`, and the arrangement editor — the
+  // only thing that calls those gestures — reaches them at `@studio/domain/composition`, an alias
+  // in `apps/web/vite.config.ts` and `tsconfig.base.json`. Measured 749_131 -> 746_905 here and
+  // 1_101_258 -> 1_098_391 for Studio, so both closures gained about two kilobytes rather than
+  // spending another thousand.
+  //
+  // A `manualChunks` entry was tried first and made it *worse* (Studio 1_101_114 -> 1_101_258):
+  // splitting the module into its own chunk does not remove the static import edge, so the closure
+  // still reaches it and now pays the chunk overhead too. Recorded so it is not tried again — the
+  // edge is the thing, not the chunk.
+  //
+  // The ceilings are deliberately not lowered to the new numbers. The arrangement's own work is
+  // what the headroom was recovered for; lowering now would spend the recovery on a second round
+  // of ledger entries.
   'src/app/shell/AuthenticatedShell.tsx': 750_000,
   // Shell plus capture graph, which is what a Studio route costs. Looser, because a Studio route is
   // where media code belongs; `FORBIDDEN_CLOSURE_DEPENDENCIES` is what keeps it from leaking out.

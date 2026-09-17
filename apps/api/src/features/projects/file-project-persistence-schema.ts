@@ -1,4 +1,5 @@
 import {
+  PROJECT_WORKING_MEDIA_KINDS,
   campaignStatusSchema,
   inspectedVideoSchema,
   projectAssetKindSchema,
@@ -244,7 +245,7 @@ export const storedProjectWorkingMediaSchema = z
   .object({
     projectId: projectIdSchema,
     ownerUserId: ownerIdSchema,
-    kind: z.enum(['local-render', 'media-asset', 'saved-video-version']),
+    kind: z.enum(PROJECT_WORKING_MEDIA_KINDS),
     mediaReference: z.discriminatedUnion('kind', [
       z.object({ kind: z.literal('asset'), assetId: z.uuid() }).strict(),
       z

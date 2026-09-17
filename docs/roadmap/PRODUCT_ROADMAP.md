@@ -250,7 +250,10 @@ preview is the rendered file, played in the arrangement editor; nothing is saved
 The gap the plan named first — no control added a clip from the Project's other media — was closed
 the same day: **Add a clip** takes any video the Project holds as the last clip.
 4.3 Composition save/export: the composition is what Save operates on; variant sets from 2.3
-apply to it.
+apply to it. **Built 2026-09-16** ([plan and record](SLICE_4.3_COMPOSITION_DELIVERABLE_PLAN.md)):
+by adoption rather than by teaching Save to render — the arrangement's stitched file becomes the
+Project's current cut, and every save path downstream is already correct. The real-stack journey
+saves a three-clip arrangement and reads back a Version of the sequence's own length.
 4.4 Pipeline convergence: standalone Studio becomes a thin entry to the durable engine ("make
 this a Project" at the end; durable results everywhere; `/api/video-jobs` becomes internal or
 explicitly the quick-tool API per D5); Project voice as a durable job (D6); AI runs stop scrimming

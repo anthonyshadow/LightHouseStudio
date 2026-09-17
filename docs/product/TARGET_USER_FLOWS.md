@@ -132,11 +132,13 @@ positions subtitles over specific time ranges; sets per-clip audio gain.
 **System:** the composition is autosaved state like everything else; preview plays the stitched
 sequence accurately.
 **Next:** refine, then save the composition as the deliverable.
-_Today (2026-09-15): the arrangement editor exists and autosaves; **Add a clip** brings any of the
+_Today (2026-09-16): the arrangement editor exists and autosaves; **Add a clip** brings any of the
 Project's sources, or the cut it currently works from, into it — an adoption an earlier revision
 made is addressable only once the working-media read takes a revision; **Render arrangement**
-produces the stitched file and plays it, which is the accurate preview; Save still operates on the
-current cut._
+produces the stitched file and plays it, which is the accurate preview; and **Keep as the current
+cut** makes that file what the Project works from, so Save and the placement variants deliver the
+arrangement. The arrangement survives being kept: change it and keep it again, and the cut does not
+follow those edits until you do._
 
 ## 12. Final refinement and identifying the deliverable
 

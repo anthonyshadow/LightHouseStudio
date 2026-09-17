@@ -128,10 +128,11 @@ describe('ProjectWorkingMediaService local authority', () => {
       sourcePath: renderPath,
       checksumSha256: renderChecksum,
       filename: '../render preview?.mp4',
+      kind: 'local-render' as const,
       localEdit,
     };
 
-    const adopted = await service().uploadLocalRender(input);
+    const adopted = await service().uploadOnDeviceRender(input);
     expect(getCurrent).toHaveBeenCalledTimes(1);
     if (!adopted.ok) throw new Error('Expected working-media adoption.');
     expect(adopted).toMatchObject({
@@ -168,7 +169,7 @@ describe('ProjectWorkingMediaService local authority', () => {
     expect(await bytes.exists(ownerUserId, assetId)).toBe(true);
 
     projects = new FileProjectRepository(directory);
-    const replayed = await service().uploadLocalRender(input);
+    const replayed = await service().uploadOnDeviceRender(input);
     expect(replayed).toMatchObject({ ok: true, replayed: true, response: { isCurrent: true } });
     await expect(service().get(ownerUserId, current.project.id)).resolves.toMatchObject({
       media: { kind: 'local-render', assetId },
@@ -212,7 +213,7 @@ describe('ProjectWorkingMediaService local authority', () => {
         contentUrl: `/api/projects/${current.project.id}/working-media/${adoptionRevisionId}/content`,
       },
     });
-    await expect(service().uploadLocalRender(input)).resolves.toMatchObject({
+    await expect(service().uploadOnDeviceRender(input)).resolves.toMatchObject({
       ok: true,
       replayed: true,
       response: {
@@ -224,7 +225,7 @@ describe('ProjectWorkingMediaService local authority', () => {
     });
 
     await expect(
-      service().uploadLocalRender({ ...input, filename: 'different.mp4' }),
+      service().uploadOnDeviceRender({ ...input, filename: 'different.mp4' }),
     ).rejects.toMatchObject({ statusCode: 409 });
   });
 
@@ -246,14 +247,15 @@ describe('ProjectWorkingMediaService local authority', () => {
       sourcePath: renderPath,
       checksumSha256: renderChecksum,
       filename: 'render.mp4',
+      kind: 'local-render' as const,
       localEdit: createDefaultVideoEditSpec(renderInspection.durationMs),
     };
 
-    await expect(interrupted.uploadLocalRender(input)).rejects.toThrow(
+    await expect(interrupted.uploadOnDeviceRender(input)).rejects.toThrow(
       'simulated working-media interruption',
     );
     projects = new FileProjectRepository(directory);
-    await expect(service().uploadLocalRender(input)).resolves.toMatchObject({
+    await expect(service().uploadOnDeviceRender(input)).resolves.toMatchObject({
       ok: true,
       replayed: true,
       response: { revision: { id: adoptionRevisionId } },

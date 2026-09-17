@@ -21,12 +21,19 @@ import type { CompositionRenderPlan } from './types';
 const mocks = vi.hoisted(
   (): {
     support: boolean | null;
+    adoption: {
+      phase: 'idle' | 'saving' | 'saved' | 'error';
+      message: string | null;
+      adopt: ReturnType<typeof vi.fn>;
+      dismiss: ReturnType<typeof vi.fn>;
+    };
     renderComposition: ReturnType<
       typeof vi.fn<(input: RenderCompositionInput) => Promise<RenderCompositionResult>>
     >;
   } => ({
     support: true,
     renderComposition: vi.fn(),
+    adoption: { phase: 'idle', message: null, adopt: vi.fn(), dismiss: vi.fn() },
   }),
 );
 vi.mock('./useVideoEditExportSupport', () => ({
@@ -39,13 +46,18 @@ vi.mock('./renderComposition', async () => {
     renderComposition: (input: RenderCompositionInput) => mocks.renderComposition(input),
   };
 });
+vi.mock('../projects/useProjectCompositionAdoption', () => ({
+  useProjectCompositionAdoption: () => mocks.adoption,
+}));
 vi.mock('../existing-video/videoValidation', () => ({
-  validateEditedVideoOutput: () => Promise.resolve({}),
+  validateEditedVideoOutput: () =>
+    Promise.resolve({ file: new File(['mp4'], 'arrangement.mp4', { type: 'video/mp4' }) }),
 }));
 
 beforeEach(() => {
   mocks.support = true;
   mocks.renderComposition.mockReset();
+  mocks.adoption = { phase: 'idle', message: null, adopt: vi.fn(), dismiss: vi.fn() };
   vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => undefined);
   vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => undefined);
   Object.defineProperty(URL, 'createObjectURL', {
@@ -762,6 +774,58 @@ describe('CompositionSurface', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Back to editing' }));
     expect(screen.queryByText(/Rendered from 2 clips/u)).toBeNull();
     expect(screen.getByText(/Showing the selected clip/u)).toBeVisible();
+  });
+
+  it('offers the rendered file as the current cut, which is what Save then delivers', async () => {
+    const deferred = deferredRender();
+    renderSurface(composition());
+    fireEvent.click(renderControl());
+    const rendered = plan();
+    await act(() => {
+      deferred.input().onPlan?.(rendered);
+      deferred.resolve({
+        blob: new Blob(['mp4'], { type: 'video/mp4' }),
+        mimeType: 'video/mp4',
+        plan: rendered,
+      });
+      return Promise.resolve();
+    });
+    const keep = await screen.findByRole('button', { name: 'Keep as the current cut' });
+    expect(keep).toBeEnabled();
+    fireEvent.click(keep);
+    // The arrangement it was rendered from is the adoption's identity, and the file is the one the
+    // validator built.
+    expect(mocks.adoption.adopt).toHaveBeenCalledWith({
+      file: expect.any(File) as File,
+      plan: rendered,
+      renderedFrom: composition(),
+    });
+  });
+
+  it('will not keep a render the arrangement has moved past, or one on an archived Project', async () => {
+    const deferred = deferredRender();
+    const view = renderSurface(composition());
+    fireEvent.click(renderControl());
+    await act(() => {
+      deferred.resolve({
+        blob: new Blob(['mp4'], { type: 'video/mp4' }),
+        mimeType: 'video/mp4',
+        plan: plan(),
+      });
+      return Promise.resolve();
+    });
+    expect(await screen.findByRole('button', { name: 'Keep as the current cut' })).toBeEnabled();
+
+    // A gesture after the render: the file no longer describes the arrangement.
+    fireEvent.click(clipOptions()[0]!);
+    fireEvent.click(screen.getByRole('button', { name: 'Mute this clip' }));
+    const keep = screen.getByRole('button', { name: 'Keep as the current cut' });
+    expect(keep).toBeDisabled();
+    expect(keep).toHaveAttribute('aria-describedby', 'composition-stale-reason');
+
+    // Archived: a render writes nothing, but keeping one appends a revision.
+    view.archive();
+    expect(screen.getByRole('button', { name: 'Keep as the current cut' })).toBeDisabled();
   });
 
   it('says the render failed in the worker’s words, that nothing changed, and offers to try again', async () => {

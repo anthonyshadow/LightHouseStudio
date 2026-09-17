@@ -77,8 +77,14 @@ widest source is the target, and no clip is narrowed for a neighbour.
   target it chose.
 - Each clip is streamed from its own content route by HTTP ranges inside the worker, one input
   open at a time, so an arrangement of a hundred clips never holds a hundred files.
-- Nothing is saved from this surface. Saving an arrangement, and exporting it to placements, is
-  slice 4.3's; the rendered Blob and its plan are what that slice will use.
+- **Keep as the current cut** hands the rendered file to the Project through the same adoption path
+  the single-clip editor uses, recorded as a `stitched-render` with no single-clip edit
+  specification, because none describes it. Save and the placement variants then deliver it without
+  knowing a composition exists. It is refused while the preview is out of date with the arrangement,
+  and on an archived Project, because keeping appends a revision where rendering writes nothing.
+- The kept cut does not follow later edits to the arrangement. Change the arrangement, render, and
+  keep it again; the surface says so, and the Save step repeats it.
+- A kept cut is never offered back as a clip of the arrangement it came from.
 - A clip is added from media the Project already holds; the panel does not upload, record or
   borrow — that is the Media area's, and a video added there is offered here on the next open.
   While the Project's media is still being read the panel says so rather than reporting nothing,

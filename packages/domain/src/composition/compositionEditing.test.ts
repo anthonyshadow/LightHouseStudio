@@ -2,27 +2,29 @@ import { describe, expect, it } from 'vitest';
 import {
   COMPOSITION_CLIP_LIMIT,
   CompositionRuleError,
-  appendClip,
   clipMediaMsAt,
-  clipOverMedia,
   compositionClipDurationMs,
   compositionDurationMs,
-  compositionIsFull,
-  compositionOverMedia,
   compositionPlacementAt,
   compositionPlacements,
-  compositionSplitRefusal,
-  compositionsEqual,
-  moveClip,
-  removeClip,
   sequenceMsAt,
-  setClipAudio,
-  setClipTrim,
-  splitCompositionAt,
   validateComposition,
   type Composition,
   type CompositionClip,
 } from './index';
+import {
+  appendClip,
+  clipOverMedia,
+  compositionIsFull,
+  compositionOverMedia,
+  compositionSplitRefusal,
+  compositionsEqual,
+  moveClip,
+  removeClip,
+  setClipAudio,
+  setClipTrim,
+  splitCompositionAt,
+} from './operations';
 import { VIDEO_EDIT_MINIMUM_TRIM_MS } from '../video-editing';
 
 const sourceAssetId = '79b94c02-d268-4201-a05b-1f3baa0caed1';

@@ -1,11 +1,17 @@
 import type { ProjectCurrentResponse } from '@studio/contracts';
 import {
   VIDEO_EDIT_HISTORY_LIMIT,
+  compositionPlacements,
+  type Composition,
+  type CompositionPlacement,
+  type ProjectMediaReference,
+  type VideoEditAudio,
+} from '@studio/domain';
+import {
   appendClip,
   clipOverMedia,
   compositionIsFull,
   compositionOverMedia,
-  compositionPlacements,
   compositionSplitRefusal,
   compositionsEqual,
   moveClip,
@@ -13,12 +19,8 @@ import {
   setClipAudio,
   setClipTrim,
   splitCompositionAt,
-  type Composition,
-  type CompositionPlacement,
-  type ProjectMediaReference,
   type CompositionSplitRefusal,
-  type VideoEditAudio,
-} from '@studio/domain';
+} from '@studio/domain/composition';
 import { useCallback, useMemo, useState } from 'react';
 import type { ProjectSessionPort } from '../projects/useProjectSession';
 

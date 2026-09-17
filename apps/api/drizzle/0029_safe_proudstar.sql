@@ -1,0 +1,2 @@
+ALTER TABLE "project_working_media_adoptions" DROP CONSTRAINT "project_working_media_kind_supported";--> statement-breakpoint
+ALTER TABLE "project_working_media_adoptions" ADD CONSTRAINT "project_working_media_kind_supported" CHECK ("project_working_media_adoptions"."kind" in ('local-render', 'media-asset', 'saved-video-version', 'stitched-render'));

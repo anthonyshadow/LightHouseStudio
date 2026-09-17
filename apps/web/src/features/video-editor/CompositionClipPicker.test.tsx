@@ -112,6 +112,20 @@ describe('CompositionClipPicker', () => {
     expect(screen.queryByRole('status')).toBeNull();
   });
 
+  it('never offers the Project’s own derived cut, which would nest a render inside itself', () => {
+    const stitched = clipMediaEntryFixture(
+      { kind: 'asset', assetId: 'a3c5e7f9-1b2d-4c6e-8f0a-2b4d6e8f0a1c' },
+      held('arrangement.mp4'),
+      true,
+    );
+    renderPicker(new Map([opening, closing, stitched]));
+    expect(rows().map((row) => row.textContent?.split('1')[0])).toEqual([
+      'opening.mp4',
+      'closing.mp4',
+    ]);
+    expect(screen.queryByRole('button', { name: /^arrangement\.mp4/u })).toBeNull();
+  });
+
   it('stops taking choices the moment it is told to close, while it is still on screen', () => {
     const { onChoose, rerender } = renderPicker(new Map([opening, closing]));
     rerender(new Map([opening, closing]), 'ready', false);

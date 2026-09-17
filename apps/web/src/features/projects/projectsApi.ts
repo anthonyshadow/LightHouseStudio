@@ -453,7 +453,12 @@ export const uploadProjectWorkingMedia = (input: {
   readonly operationKey: string;
   readonly expectedVersion: number;
   readonly expectedRevisionNumber: number;
-  readonly localEdit: NonNullable<ProjectCurrentResponse['revision']['snapshot']['localEdit']>;
+  /**
+   * What made the bytes. A single-clip render states the edit its pixels already carry; a stitched
+   * arrangement states none, and the contract refuses either one without the other agreeing.
+   */
+  readonly kind: 'local-render' | 'stitched-render';
+  readonly localEdit: ProjectCurrentResponse['revision']['snapshot']['localEdit'];
   readonly signal?: AbortSignal;
 }): Promise<ProjectWorkingMediaResponse> =>
   requestJson(
@@ -470,6 +475,7 @@ export const uploadProjectWorkingMedia = (input: {
             expectedVersion: input.expectedVersion,
             expectedRevisionNumber: input.expectedRevisionNumber,
             filename: input.file.name,
+            kind: input.kind,
             localEdit: input.localEdit,
           }),
         ),

@@ -55,7 +55,12 @@ interface UploadProjectWorkingMediaInput {
   readonly sourcePath: string;
   readonly checksumSha256: string;
   readonly filename: string;
-  readonly localEdit: VideoEditSpec;
+  /**
+   * What made the bytes. A single-clip render carries the edit its pixels already hold; a stitched
+   * arrangement carries none, because no single-clip specification describes it.
+   */
+  readonly kind: 'local-render' | 'stitched-render';
+  readonly localEdit: VideoEditSpec | null;
 }
 
 interface ReuseProjectWorkingMediaInput {
@@ -141,7 +146,7 @@ export class ProjectWorkingMediaService {
     await this.bytes.delete(ownerUserId, assetId).catch(() => undefined);
   }
 
-  async uploadLocalRender(
+  async uploadOnDeviceRender(
     input: UploadProjectWorkingMediaInput,
   ): Promise<ProjectWorkingMediaMutationResult> {
     return this.#lock.run(`${input.ownerUserId}:${input.operationKey}`, async () => {
@@ -154,7 +159,8 @@ export class ProjectWorkingMediaService {
         projectId: input.projectId,
         expectedVersion: input.expectedVersion,
         expectedRevisionNumber: input.expectedRevisionNumber,
-        kind: 'local-render',
+        // In the fingerprint, so an operation key minted for one kind can never replay as the other.
+        kind: input.kind,
         filename,
         checksumSha256: input.checksumSha256,
         inspected,
@@ -180,7 +186,7 @@ export class ProjectWorkingMediaService {
               requestFingerprint,
               expectedVersion: input.expectedVersion,
               expectedRevisionNumber: input.expectedRevisionNumber,
-              kind: 'local-render',
+              kind: input.kind,
               assetId: manifest.assetId,
               savedVideoId: null,
               videoVersionId: null,

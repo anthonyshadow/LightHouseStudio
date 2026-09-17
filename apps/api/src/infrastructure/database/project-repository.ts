@@ -260,7 +260,7 @@ const currentWorkingMediaMatch = sql`(
   and (
     (
       ${projectRevisions.snapshot} -> 'workingMedia' ->> 'kind' = 'asset'
-      and ${projectWorkingMediaAdoptions.kind} in ('local-render', 'media-asset')
+      and ${projectWorkingMediaAdoptions.kind} in ('local-render', 'media-asset', 'stitched-render')
       and ${projectWorkingMediaAdoptions.assetId}::text = ${projectRevisions.snapshot} -> 'workingMedia' ->> 'assetId'
     )
     or (

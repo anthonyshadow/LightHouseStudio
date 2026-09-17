@@ -18,6 +18,7 @@ import type {
   StoredSavedVideoAggregate,
   StoredVideoVersion,
 } from '../saved-videos/saved-video-repository.js';
+import type { PROJECT_WORKING_MEDIA_KINDS } from '@studio/contracts';
 import type { ListTotal, ProjectOutputSaveResult } from '@studio/contracts';
 
 export type ProjectPersistenceMutationResult =
@@ -131,7 +132,7 @@ export const projectSourceMediaReference = (source: ProjectSourceRecord): Projec
       }
     : { kind: 'asset', assetId: source.assetId };
 
-export type ProjectWorkingMediaKind = 'local-render' | 'media-asset' | 'saved-video-version';
+export type ProjectWorkingMediaKind = (typeof PROJECT_WORKING_MEDIA_KINDS)[number];
 
 /**
  * What the server learned about a re-framed video when it accepted the upload, kept so the save

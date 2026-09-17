@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { getTableConfig, PgDialect, type AnyPgTable } from 'drizzle-orm/pg-core';
-import { READABLE_PROJECT_SNAPSHOT_SCHEMA_VERSIONS } from '@studio/contracts';
+import {
+  PROJECT_WORKING_MEDIA_KINDS,
+  READABLE_PROJECT_SNAPSHOT_SCHEMA_VERSIONS,
+} from '@studio/contracts';
 import {
   assetStatus,
   assetStorageProvider,
@@ -31,6 +34,7 @@ import {
   projectSources,
   projectStatus,
   projectVersionReferenceRole,
+  projectWorkingMediaAdoptions,
   projectVersionReferences,
   referenceImageAssets,
   resourceReferences,
@@ -115,6 +119,25 @@ describe('Drizzle persistence schema', () => {
     expect(renderedSnapshotVersionCheck.replaceAll(/\s/gu, '')).toContain(
       `in(${READABLE_PROJECT_SNAPSHOT_SCHEMA_VERSIONS.join(',')})`,
     );
+    /*
+     * The same holding for the working-media kind, which is constrained in five places TypeScript
+     * cannot see into: two Zod enums, this check, the raw predicate that decides which adoption is
+     * the current cut, and the api type. A kind missing from the check fails at the first insert;
+     * one missing from the predicate is worse, because the write succeeds and every later read
+     * returns nothing, in Postgres only.
+     */
+    const workingMediaKindCheck = getTableConfig(projectWorkingMediaAdoptions).checks.find(
+      ({ name }) => name === 'project_working_media_kind_supported',
+    );
+    expect(workingMediaKindCheck).toBeDefined();
+    const renderedWorkingMediaKindCheck = new PgDialect().sqlToQuery(
+      workingMediaKindCheck!.value,
+    ).sql;
+    expect(renderedWorkingMediaKindCheck).toContain('"kind"');
+    expect(renderedWorkingMediaKindCheck.replaceAll(/\s/gu, '')).toContain(
+      `in(${PROJECT_WORKING_MEDIA_KINDS.map((kind) => `'${kind}'`).join(',')})`,
+    );
+
     expect(
       [videoVersions, projectAssets, projectVersionReferences, projectJobs, projectOutputs].flatMap(
         (table) => getTableConfig(table).indexes.map(({ config }) => config.name),

@@ -138,9 +138,15 @@ describe('projectClipMediaCatalogue', () => {
       projectMediaReferenceKey({ kind: 'asset', assetId: ids.original }),
       projectMediaReferenceKey({ kind: 'asset', assetId: ids.adopted }),
     ]);
+    // Derived: nothing in the collection explains it, so the arrangement may be seeded over it but
+    // it must not be offered as a clip to add.
     expect(
       catalogue.get(projectMediaReferenceKey({ kind: 'asset', assetId: ids.adopted })),
-    ).toEqual({ reference: { kind: 'asset', assetId: ids.adopted }, media: adopted });
+    ).toEqual({
+      reference: { kind: 'asset', assetId: ids.adopted },
+      media: adopted,
+      derived: true,
+    });
   });
 
   it('answers null for media neither input explains, and ignores a presented reference without a cut', () => {

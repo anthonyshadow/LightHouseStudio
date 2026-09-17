@@ -171,7 +171,9 @@ const outputOrigin = (current: ProjectCurrentRead, media: ReadyProjectMedia): Sa
   if (transform.visualTreatment.kind === 'character-swap') return 'character-swap';
   if (transform.visualTreatment.kind === 'virtual-try-on') return 'virtual-try-on';
   if (transform.selectedVoice !== null) return 'voice-treatment';
-  if (snapshot.localEdit !== null) return 'editor';
+  // A stitched arrangement carries no single-clip edit, so `localEdit` alone would call an
+  // arrangement's deliverable an upload.
+  if (snapshot.localEdit !== null || snapshot.composition !== null) return 'editor';
   if (media.savedVersion !== null) return media.savedVersion.origin;
   if (media.source?.kind === 'recorded') return 'recorded';
   return 'uploaded';

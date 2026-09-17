@@ -54,6 +54,10 @@ export default defineConfig(() => {
     ],
     resolve: {
       alias: {
+        // Before the barrel, so the more specific entry wins. The arrangement's clip gestures are
+        // reached by this path rather than through `@studio/domain`, which would put them in the
+        // module graph of every file importing the barrel — see the bundle ledger.
+        '@studio/domain/composition': `${rootPath}/packages/domain/src/composition/operations.ts`,
         '@studio/domain': `${rootPath}/packages/domain/src/index.ts`,
         '@studio/contracts': `${rootPath}/packages/contracts/src/index.ts`,
       },

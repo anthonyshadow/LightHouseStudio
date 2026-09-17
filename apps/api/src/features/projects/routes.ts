@@ -561,7 +561,7 @@ export const registerProjectRoutes = (
           }
           return sendReplayableMutation(
             reply,
-            await workingMediaService.uploadLocalRender({
+            await workingMediaService.uploadOnDeviceRender({
               ownerUserId: ownerUserIdForRequest(request),
               projectId: params.data.projectId,
               operationKey: operationKey.data,
@@ -570,6 +570,7 @@ export const registerProjectRoutes = (
               sourcePath: upload.path,
               checksumSha256: upload.checksumSha256,
               filename: metadata.filename,
+              kind: metadata.kind,
               localEdit: metadata.localEdit,
             }),
           );

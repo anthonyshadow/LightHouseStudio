@@ -39,6 +39,13 @@ export const projectSourceReference = (
 export interface ProjectClipMediaEntry {
   readonly reference: ProjectMediaReference;
   readonly media: ProjectClipMedia;
+  /**
+   * Whether this is the cut the revision presents and nothing the Project holds — a render or an
+   * adopted result rather than a source. An arrangement is seeded over it, but it must not be
+   * *added* to one: once a stitched render is the cut, offering it as a clip would nest the
+   * arrangement inside its own output.
+   */
+  readonly derived: boolean;
 }
 
 /**
@@ -59,7 +66,11 @@ export const projectClipMediaCatalogue = (
   const catalogue = new Map<string, ProjectClipMediaEntry>();
   for (const source of sources) {
     const reference = projectSourceReference(source);
-    catalogue.set(projectMediaReferenceKey(reference), { reference, media: currentCutOf(source) });
+    catalogue.set(projectMediaReferenceKey(reference), {
+      reference,
+      media: currentCutOf(source),
+      derived: false,
+    });
   }
   // Last, so the presented cut wins where it is also a held source: same media, and the cut is the
   // description the stage is already using. A `Map` keeps the position of a key it already holds,
@@ -67,9 +78,12 @@ export const projectClipMediaCatalogue = (
   if (presented.reference !== null && presented.cut !== null) {
     // Set as it came: it is already the cut's own projection, and re-making it would hand the
     // surface a copy that compares unequal to the one the cache holds.
-    catalogue.set(projectMediaReferenceKey(presented.reference), {
+    const key = projectMediaReferenceKey(presented.reference);
+    catalogue.set(key, {
       reference: presented.reference,
       media: presented.cut,
+      // Derived only where the collection never held it: the presented cut is usually a source.
+      derived: !catalogue.has(key),
     });
   }
   return catalogue;

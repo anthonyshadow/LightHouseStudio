@@ -31,7 +31,8 @@ export const clipMediaFixture = (
 export const clipMediaEntryFixture = (
   reference: ProjectMediaReference,
   media: ProjectClipMedia,
+  derived = false,
 ): readonly [string, ProjectClipMediaEntry] => [
   projectMediaReferenceKey(reference),
-  { reference, media },
+  { reference, media, derived },
 ];

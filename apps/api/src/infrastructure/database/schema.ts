@@ -1105,8 +1105,10 @@ export const projectWorkingMediaAdoptions = pgTable(
       sql`(${table.kind} = 'saved-video-version' and ${table.savedVideoId} is not null and ${table.videoVersionId} is not null) or (${table.kind} <> 'saved-video-version' and ${table.savedVideoId} is null and ${table.videoVersionId} is null)`,
     ),
     check(
+      // Held to `PROJECT_WORKING_MEDIA_KINDS` by `schema.test.ts`: a check constraint is literal
+      // SQL, so the list is written here and the oracle is what stops the two drifting.
       'project_working_media_kind_supported',
-      sql`${table.kind} in ('local-render', 'media-asset', 'saved-video-version')`,
+      sql`${table.kind} in ('local-render', 'media-asset', 'saved-video-version', 'stitched-render')`,
     ),
     check('project_working_media_revision_positive', sql`${table.adoptedRevisionNumber} > 0`),
     check('project_working_media_size_positive', sql`${table.sizeBytes} > 0`),

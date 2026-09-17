@@ -11,6 +11,14 @@ export type CompositionRenderPhase = 'idle' | 'rendering' | 'validating' | 'read
 export interface CompositionRenderReady {
   readonly blob: Blob;
   readonly url: string;
+  /**
+   * The same bytes the validator inspected, as a file the Project can be given.
+   *
+   * It is built during validation either way; keeping it costs one wrapper rather than a second
+   * copy of the video. Only the file is kept: the whole validated result holds a standalone copy
+   * of the arrangement's audio, which would then live as long as the preview does.
+   */
+  readonly file: File;
   readonly plan: CompositionRenderPlan;
   /** So a gesture after the render can be told from the arrangement it shows. */
   readonly renderedFrom: Composition;
@@ -84,8 +92,9 @@ export const useCompositionRender = () => {
         // the same, and the catch below is the one place that says so.
         controller.signal.throwIfAborted();
         setPhase('validating');
+        let validated;
         try {
-          await validateEditedVideoOutput(
+          validated = await validateEditedVideoOutput(
             outcome.blob,
             {
               width: outcome.plan.video.target.width,
@@ -116,6 +125,7 @@ export const useCompositionRender = () => {
         const next: CompositionRenderReady = {
           blob: outcome.blob,
           url: URL.createObjectURL(outcome.blob),
+          file: validated.file,
           plan: outcome.plan,
           renderedFrom: composition,
         };
