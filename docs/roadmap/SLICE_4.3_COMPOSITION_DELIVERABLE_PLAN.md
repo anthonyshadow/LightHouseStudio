@@ -215,4 +215,53 @@ paths that differ, and stage 5's central trap is invisible in file mode.
 
 ## 5. Record
 
-Filled in as the stages land.
+All six stages landed on 2026-09-16, in the planned order. `bun run quality` exits 0 with 2,631
+tests; the real-stack journey and the stitched-render spec pass in Chromium on the isolated stack.
+
+| Stage              | Commit     | Note                                                                                                                                                                                 |
+| ------------------ | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1 Small truths     | `74df7647` | The staged-null fix made the un-arranged branch reachable, so the Undo boundary moved into `canUndo` as well as the handler. The predicted test break happened where the audit said. |
+| 2 Restore          | `94b32b8a` | Smaller than its blast radius: no domain, contract or repository change. Both recovery sweeps gained the `archivedAt` predicate.                                                     |
+| 3 Save state       | `bb04bdab` | The masthead stays hidden; un-hiding it would have made its own **Arrange** button live during a takeover.                                                                           |
+| 4 Over-long render | `36df9bfd` | Refused on the trimmed sequence length, so trimming re-enables it.                                                                                                                   |
+| 5 The deliverable  | `8cf7b066` | Plus the bundle recovery; see below.                                                                                                                                                 |
+| 6 Captions         | `5954cd68` | The single clip's nineteen subtitle cases passed untouched, which is the extraction's proof.                                                                                         |
+
+### 5.1 What the bundle actually needed
+
+The approved chunk rule did not work as specified, and the failure is recorded in the ledger so it
+is not repeated. A `manualChunks` entry for the arrangement's domain operations made Studio's
+closure **worse** — 1,101,114 to 1,101,258 — because splitting a module into its own chunk leaves
+the static import edge intact, so the closure still reaches it and now pays the chunk overhead too.
+
+The edge is the thing. `composition/index.ts` no longer re-exports `./operations`, and the
+arrangement editor reaches those gestures at `@studio/domain/composition`, an alias in the Vite,
+Vitest and TypeScript configurations. Measured 749,131 → 746,905 for the shell and 1,101,258 →
+1,098,391 for Studio: about two kilobytes back in each. Stage 6's domain gestures then cost the
+shell nothing and Studio eight bytes, which is the whole point of having done it.
+
+The ceilings were deliberately not lowered to the new numbers. The recovery was made to pay for the
+arrangement's own work, not to be spent on a second round of ledger entries.
+
+### 5.2 Traps that only the right test would have caught
+
+- **A raw SQL predicate lists the working-media kinds** and decides which adoption is the current
+  cut. Adding a kind without it writes successfully and then returns nothing on every later read,
+  in Postgres only, with file mode green. There is now one runtime list and a schema oracle.
+- **The recovery check that establishes "my upload landed"** compared edit specifications, which
+  are null on both sides for a stitched render — vacuously true, and it would have accepted a cut
+  adopted in another tab. It now checks the server's own facts, anchored on the revision.
+- **The adopted cut became addable as a clip of itself**, which would nest a render inside the next.
+  A presented cut the collection never held is marked derived and the picker skips it.
+
+### 5.3 Accepted, not fixed
+
+- Nothing durably records that a kept cut is still current with the arrangement. Edit the
+  arrangement afterwards and Save delivers the previous render until it is kept again. Both
+  surfaces say so; the durable fix is one nullable column and is not built.
+- Restore reports no current attempt, so a Project archived with a failed job restores as ready
+  until the sweep re-derives it. The checkpoint path has always done this; the two should change
+  together.
+- A placement variant of an arrangement re-frames a stitched frame that may already carry bars.
+  Re-stitching straight to each placement's frame would avoid that, and is the eventual argument
+  for making Save composition-aware directly.

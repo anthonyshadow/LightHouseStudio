@@ -6,6 +6,12 @@ verification"), run on 2026-09-16 at head `0aea1955`. It verifies the
 running product, and files follow-ups rather than fixing what it finds. Prompt 35 is a gate: its
 failures pause the sequence rather than being papered over.
 
+> **Closed 2026-09-16.** All five failures below are fixed, in the six stages of
+> [`SLICE_4.3_COMPOSITION_DELIVERABLE_PLAN.md`](../roadmap/SLICE_4.3_COMPOSITION_DELIVERABLE_PLAN.md).
+> The record of what this document measured is left exactly as it was measured; the fixes are
+> recorded there rather than edited into the evidence. The sharpest measurement here — a 2.00 s
+> arrangement saved as a 1,000 ms video — is now a regression test that asserts the opposite.
+
 ## Verdict
 
 **The gate does not pass.** Nine of fourteen checks pass. Five fail, and they are not the same

@@ -427,6 +427,14 @@ recorded in the report.
 > integrity note below, the sequence pauses here: prompt 36 should not run until at least the
 > restore defect has an owner and 4.3 is scheduled against the save gap.
 >
+> **Re-verified and closed 2026-09-16.** All five failures were fixed in six stages on the
+> operator's approval; the plan and the record are in
+> [`SLICE_4.3_COMPOSITION_DELIVERABLE_PLAN.md`](SLICE_4.3_COMPOSITION_DELIVERABLE_PLAN.md). An
+> arrangement is now built, captioned across a cut, rendered, kept as the Project's current cut and
+> saved, and the real-stack journey reads back a Version of the sequence's own length. An archived
+> Project that holds media can be restored. The arrangement surface says whether it is saved. The
+> sequence may resume at prompt 36.
+>
 > The vision's core workflow lists ten items, not eleven; this prompt's "3, 6–11" was read as the
 > vision's 3 and 6–10, which is what its own concrete list enumerates.
 
