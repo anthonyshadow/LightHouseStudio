@@ -300,6 +300,20 @@ export const ProjectMediaSection = ({
           </StatusNotice>
         ) : null}
 
+        {/*
+          A Project can name an original it does not hold: a duplicate carries the pointer without
+          the material, and the server says so in its own words. Without this the area renders its
+          heading and its promise over nothing at all.
+        */}
+        {!controller.query.isPending &&
+        !controller.query.isError &&
+        controller.sources.length === 0 ? (
+          <StatusNotice role="status" tone="neutral" title="No media of its own yet">
+            This Project was copied from another one, so it names a video it does not hold. Add a
+            video here and it becomes the Project&rsquo;s own material.
+          </StatusNotice>
+        ) : null}
+
         {controller.sources.length > 0 ? (
           <ul aria-label="Media in this Project" css={videoRowListStyles(theme)}>
             {controller.sources.map((source) => {

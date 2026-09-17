@@ -235,6 +235,17 @@ describe('ProjectMediaSection', () => {
     vi.restoreAllMocks();
   });
 
+  it('says a duplicated Project holds no media of its own, rather than showing an empty area', async () => {
+    installSources([]);
+    renderSection();
+    await waitFor(() =>
+      expect(
+        screen.getByText(/copied from another one, so it names a video it does not hold/u),
+      ).toBeVisible(),
+    );
+    expect(screen.queryByRole('list', { name: 'Media in this Project' })).toBeNull();
+  });
+
   it('lists everything the Project holds, names the original, and offers Remove on nothing else', async () => {
     installSources([source(ids.original), source(ids.extra, { kind: 'recorded' })]);
     renderSection();

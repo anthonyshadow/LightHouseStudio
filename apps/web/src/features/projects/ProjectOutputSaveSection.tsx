@@ -198,6 +198,13 @@ export const ProjectOutputSaveSection = ({
   );
   // The chosen placement lives on the revision, so the snapshot is the value the control shows.
   const placement = current.revision.snapshot.exportSpecification;
+  /*
+   * An arrangement is not what Save operates on. Saying nothing let an operator build one, render
+   * it, press Save and receive the presented source instead — a two-second arrangement delivered as
+   * a one-second video, with no notice. It informs and never blocks: saving the cut on the stage is
+   * a legitimate thing to want.
+   */
+  const arrangedClipCount = current.revision.snapshot.composition?.clips.length ?? 0;
   /** The placements a save can also make: every one except whichever the revision already chose. */
   const alsoAvailable = useMemo(
     () =>
@@ -873,6 +880,11 @@ export const ProjectOutputSaveSection = ({
               This frame and the selected placement are what the saved video will use.
             </p>
           </div>
+          {arrangedClipCount > 0 ? (
+            <StatusNotice role="status" tone="warning" title="Your arrangement is not included">
+              {`This Project has an arrangement of ${arrangedClipCount} clips. Save uses the current cut shown below — one video — not the arrangement. Your arrangement is unchanged either way.`}
+            </StatusNotice>
+          ) : null}
           <div css={currentCutSummaryStyles(theme)}>
             <span data-current-cut-mark aria-hidden="true">
               <AppIcon name="video" />

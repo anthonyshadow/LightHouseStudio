@@ -72,7 +72,17 @@ export const useCompositionSession = (
    * arrangement is what the operator is looking at, and reading the snapshot alone would make every
    * gesture appear to revert until the autosave landed.
    */
-  const stored = session.proposal?.composition ?? current.revision.snapshot.composition;
+  /*
+   * `proposal === null` is the only "nothing is staged". A proposal's own `composition` is
+   * required and nullable, so `??` would read a *deliberately* staged `null` — the last clip
+   * removed, or an undo back past the first arrangement — as absent and fall through to the
+   * arrangement the snapshot still holds. The surface then says the Project is no longer arranged
+   * while the strip still shows a clip, and only the autosave landing makes it true.
+   */
+  const stored =
+    session.proposal === null
+      ? current.revision.snapshot.composition
+      : session.proposal.composition;
   const composition = gesture?.value ?? stored;
   const placements = useMemo<readonly CompositionPlacement[]>(
     () => (composition === null ? [] : compositionPlacements(composition)),
@@ -226,6 +236,8 @@ export const useCompositionSession = (
     setHistory(({ past, future }) => {
       const previous = past.at(-1);
       if (previous === undefined) return { past, future };
+      // The boundary below says this is unreachable; the guard keeps it true if that changes.
+      if (previous === null) return { past, future };
       if (!session.propose({ composition: previous })) return { past, future };
       return {
         past: past.slice(0, -1),
@@ -271,7 +283,13 @@ export const useCompositionSession = (
     audio,
     undo,
     redo,
-    canUndo: history.past.length > 0,
+    /*
+     * `null` in the history is the Project before it was arranged, which `arrange` records so the
+     * entry counts. Stepping into it would land on the un-arranged screen, which is one button and
+     * carries no Redo — a history nothing on screen could reach. The arrangement's own beginning is
+     * where Undo stops.
+     */
+    canUndo: history.past.at(-1) != null,
     canRedo: history.future.length > 0,
   } as const;
 };

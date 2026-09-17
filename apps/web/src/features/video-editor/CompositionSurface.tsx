@@ -47,6 +47,8 @@ import { useVideoEditExportSupport } from './useVideoEditExportSupport';
 import { renderProgressStyles } from './VideoEditWorkspace.styles';
 
 const SPLIT_REASON_ID = 'composition-split-reason';
+/** The archived Project's reason, named once: an arranged surface and an un-arranged one share it. */
+const ARCHIVED_REASON_ID = 'composition-archived-reason';
 const ARRANGEMENT_FULL_REASON_ID = 'composition-full-reason';
 
 /**
@@ -416,11 +418,22 @@ export const CompositionSurface = ({
               <Button
                 variant="primary"
                 disabled={archived}
+                aria-describedby={archived ? ARCHIVED_REASON_ID : undefined}
                 onClick={() => arrange(presented, presentedMedia.durationMs)}
               >
                 Arrange this video
               </Button>
             </div>
+            {archived ? (
+              <StatusNotice
+                id={ARCHIVED_REASON_ID}
+                role="status"
+                tone="warning"
+                title="Read-only Project"
+              >
+                This Project is archived. Restore it before arranging this video.
+              </StatusNotice>
+            ) : null}
           </>
         )}
       </section>
@@ -580,10 +593,10 @@ export const CompositionSurface = ({
         >
           Add a clip
         </Button>
-        <Button variant="quiet" disabled={!canUndo || rendering} onClick={undo}>
+        <Button variant="quiet" disabled={!canUndo || blocked} onClick={undo}>
           Undo
         </Button>
-        <Button variant="quiet" disabled={!canRedo || rendering} onClick={redo}>
+        <Button variant="quiet" disabled={!canRedo || blocked} onClick={redo}>
           Redo
         </Button>
         <Button
@@ -773,7 +786,12 @@ export const CompositionSurface = ({
             </>
           )}
           {archived ? (
-            <StatusNotice role="status" tone="warning" title="Read-only Project">
+            <StatusNotice
+              id={ARCHIVED_REASON_ID}
+              role="status"
+              tone="warning"
+              title="Read-only Project"
+            >
               This Project is archived. Restore it to change its arrangement. You can still render a
               preview of it.
             </StatusNotice>

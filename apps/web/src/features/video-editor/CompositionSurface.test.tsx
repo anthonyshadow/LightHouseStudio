@@ -174,6 +174,9 @@ const createSession = (arrangement: Composition | null) => {
   return {
     port,
     propose,
+    /** What the surface would read: `null` only when nothing is staged at all. */
+    proposed: (): { readonly composition: Composition | null } | null =>
+      proposal === null ? null : { composition: proposal.composition ?? null },
     staged: () => proposal?.composition ?? null,
     bind: (fn: () => void) => {
       rerender = fn;
@@ -193,39 +196,43 @@ const renderSurface = (
   const session = createSession(arrangement);
   const onClose = vi.fn();
   const onRetryMedia = vi.fn();
-  const view = render(
+  /*
+   * Counting, and hoisted so the first render and every re-render share it. A fixed id made the
+   * second minted thing a silent no-op, because the domain de-duplicates by id and an unchanged
+   * arrangement stages nothing. `clipId(9)` is still the first id minted.
+   */
+  let minted = 8;
+  const mintId = () => clipId((minted += 1));
+  let archived = overrides.archived ?? false;
+  // One tree for the first render and every re-render, so a staged proposal and a changed
+  // `archived` reach the surface the same way the Project route would deliver them.
+  const tree = () => (
     <StudioDesignProvider>
       <CompositionSurface
-        current={current(arrangement, presentedMedia)}
+        current={current(session.proposed()?.composition ?? arrangement, presentedMedia)}
         session={session.port}
         media={media}
         mediaStatus="ready"
         onRetryMedia={onRetryMedia}
-        archived={overrides.archived ?? false}
+        archived={archived}
         onClose={onClose}
-        createId={() => clipId(9)}
+        createId={mintId}
         onRenderingChange={overrides.onRenderingChange}
       />
-    </StudioDesignProvider>,
+    </StudioDesignProvider>
   );
-  session.bind(() =>
-    view.rerender(
-      <StudioDesignProvider>
-        <CompositionSurface
-          current={current(session.staged() ?? arrangement, presentedMedia)}
-          session={session.port}
-          media={media}
-          mediaStatus="ready"
-          onRetryMedia={onRetryMedia}
-          archived={overrides.archived ?? false}
-          onClose={onClose}
-          createId={() => clipId(9)}
-          onRenderingChange={overrides.onRenderingChange}
-        />
-      </StudioDesignProvider>,
-    ),
-  );
-  return { session, onClose, view };
+  const view = render(tree());
+  session.bind(() => view.rerender(tree()));
+  return {
+    session,
+    onClose,
+    view,
+    /** Archives the Project under the surface, the way another tab would. */
+    archive: () => {
+      archived = true;
+      view.rerender(tree());
+    },
+  };
 };
 
 const clipOptions = () => within(screen.getByRole('listbox')).getAllByRole('option');
@@ -310,12 +317,21 @@ describe('CompositionSurface', () => {
     expect(session.staged()?.clips[1]?.audio).toEqual({ level: 100, muted: false });
   });
 
-  it('un-arranges the Project when the last clip is removed, rather than keeping an empty one', () => {
-    const { session } = renderSurface({ ...composition(), clips: [composition().clips[0]!] });
+  it('un-arranges the Project when the last clip is removed, and shows it at once', () => {
+    const { session } = renderSurface(
+      { ...composition(), clips: [composition().clips[0]!] },
+      { presentedMedia: { kind: 'asset', assetId } },
+    );
     fireEvent.click(clipOptions()[0]!);
     fireEvent.click(screen.getByRole('button', { name: 'Remove this clip' }));
     expect(session.propose).toHaveBeenCalledWith({ composition: null });
-    expect(screen.getByText(/no longer arranged/u)).toBeInTheDocument();
+    /*
+     * The staged `null` is what the operator is looking at, without waiting for the autosave: the
+     * strip is gone and the un-arranged screen is here. Read through the proposal rather than the
+     * snapshot, this used to keep showing the clip that had just been removed.
+     */
+    expect(screen.queryByRole('listbox')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Arrange this video' })).toBeVisible();
   });
 
   it('adds one of the Project’s videos as the last clip, selects it, and says so', async () => {
@@ -480,6 +496,38 @@ describe('CompositionSurface', () => {
     ).toBeVisible();
     fireEvent.click(clipOptions()[0]!);
     expect(screen.getByRole('alert')).toHaveTextContent(/can no longer open/u);
+  });
+
+  it('keeps Undo and Redo off a Project that was archived under the operator', () => {
+    const view = renderSurface();
+    fireEvent.click(clipOptions()[0]!);
+    fireEvent.click(screen.getByRole('button', { name: 'Move later' }));
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeEnabled();
+
+    // Archived from another tab, with the history still in hand: a press would stage a change the
+    // server refuses, and the refusal would be invisible here.
+    view.archive();
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Redo' })).toBeDisabled();
+  });
+
+  it('never steps back past the arrangement’s own beginning', () => {
+    const { session } = renderSurface(null, { presentedMedia: { kind: 'asset', assetId } });
+    fireEvent.click(screen.getByRole('button', { name: 'Arrange this video' }));
+    expect(clipOptions()).toHaveLength(1);
+    // The un-arranged screen carries no Redo, so stepping into it would strand the history.
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeDisabled();
+    expect(session.propose).toHaveBeenCalledTimes(1);
+  });
+
+  it('says why an archived Project that was never arranged cannot be', () => {
+    renderSurface(null, { archived: true, presentedMedia: { kind: 'asset', assetId } });
+    const arrange = screen.getByRole('button', { name: 'Arrange this video' });
+    expect(arrange).toBeDisabled();
+    expect(arrange).toHaveAttribute('aria-describedby', 'composition-archived-reason');
+    expect(
+      screen.getByText('This Project is archived. Restore it before arranging this video.'),
+    ).toBeVisible();
   });
 
   it('states that an archived Project is read-only and disables every way to change it', () => {

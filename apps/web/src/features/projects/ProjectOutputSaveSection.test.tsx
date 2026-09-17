@@ -365,6 +365,39 @@ afterEach(() => {
 });
 
 describe('Project output save UI', () => {
+  it('says an arrangement is not included, without blocking the save', async () => {
+    const arranged = current();
+    renderSection(session(), {
+      currentValue: {
+        ...arranged,
+        revision: {
+          ...arranged.revision,
+          snapshot: {
+            ...arranged.revision.snapshot,
+            composition: {
+              clips: [1, 2, 3].map((index) => ({
+                id: `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`,
+                media: { kind: 'asset', assetId: sourceAssetId },
+                trim: { startMs: 0, endMs: 1_000 },
+                audio: { level: 100, muted: false },
+              })),
+              subtitles: [],
+            },
+          },
+        },
+      } as ProjectCurrentResponse,
+    });
+    expect(await screen.findByText(/This Project has an arrangement of 3 clips/u)).toBeVisible();
+    // It informs and never blocks: saving the cut on the stage is a legitimate thing to want.
+    expect(await screen.findByRole('button', { name: /^Save video ·/u })).toBeEnabled();
+  });
+
+  it('says nothing about an arrangement when the Project has none', async () => {
+    renderSection();
+    expect(await screen.findByRole('button', { name: /^Save video ·/u })).toBeEnabled();
+    expect(screen.queryByText(/arrangement/u)).toBeNull();
+  });
+
   it('reveals one destination choice and sends one exact current-media command', async () => {
     let requestBody: unknown;
     let operationId = '';
