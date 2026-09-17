@@ -401,7 +401,7 @@ export const ProjectLifecycleDialog = ({
         action === 'archive'
           ? (archiveBlockedReason ??
             'Archived Projects leave the active workspace and retain their durable history.')
-          : 'Restoring returns this empty Project to the active workspace.'
+          : 'Restoring returns this Project, with everything it holds, to the active workspace.'
       }
       body={
         <p>

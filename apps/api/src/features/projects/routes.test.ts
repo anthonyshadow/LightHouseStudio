@@ -135,6 +135,75 @@ describe('Project lifecycle routes', () => {
     expect(restored.json()).toMatchObject({ project: { status: 'draft', version: 4 } });
   });
 
+  it('archives and restores a Project that holds media, deriving its status again', async () => {
+    /*
+     * The gate's finding: restore used to refuse any Project carrying media, because it handed the
+     * rule empty facts. Archiving was therefore one-way for every Project that had ever held a
+     * video — and nothing tested it, because the only restore test used an empty Project.
+     */
+    const app = localApp();
+    const projectId = json<{ project: { id: string } }>(
+      (await create(app, 'Holds a video')).response,
+    ).project.id;
+    const fixture = Buffer.from(
+      (
+        await readFile(
+          new URL('../../../../../e2e/fixtures/decodable-h264-video.base64', import.meta.url),
+          'utf8',
+        )
+      ).replaceAll(/\s/gu, ''),
+      'base64',
+    );
+    const accepted = await app.inject({
+      method: 'POST',
+      url: `/api/projects/${projectId}/source`,
+      headers: {
+        ...browserHeaders,
+        'content-type': 'video/mp4',
+        'idempotency-key': randomUUID(),
+        'x-lightframe-project-source': encodeURIComponent(
+          JSON.stringify({
+            expectedVersion: 1,
+            expectedRevisionNumber: 1,
+            kind: 'uploaded',
+            filename: 'held.mp4',
+          }),
+        ),
+      },
+      payload: fixture,
+    });
+    expect(accepted.statusCode).toBe(201);
+    expect(accepted.json()).toMatchObject({ project: { status: 'ready', version: 2 } });
+
+    const archived = await app.inject({
+      method: 'POST',
+      url: `/api/projects/${projectId}/archive`,
+      headers: { ...browserHeaders, 'content-type': 'application/json' },
+      payload: { expectedVersion: 2 },
+    });
+    expect(archived.statusCode).toBe(200);
+    expect(archived.json()).toMatchObject({ project: { status: 'archived', version: 3 } });
+
+    const restored = await app.inject({
+      method: 'POST',
+      url: `/api/projects/${projectId}/restore`,
+      headers: { ...browserHeaders, 'content-type': 'application/json' },
+      payload: { expectedVersion: 3 },
+    });
+    expect(restored.statusCode).toBe(200);
+    // Derived from what the snapshot holds, not asserted as `draft`: it still has its source.
+    expect(restored.json()).toMatchObject({ project: { status: 'ready', version: 4 } });
+
+    const active = await app.inject({
+      method: 'GET',
+      url: '/api/projects?lifecycle=active',
+      headers: browserHeaders,
+    });
+    expect(json<{ projects: { id: string }[] }>(active).projects.map(({ id }) => id)).toContain(
+      projectId,
+    );
+  });
+
   it('tombstones only one archived Project after explicit confirmation and hides it from reads', async () => {
     const app = localApp();
     const first = (await create(app, 'Delete this Project')).response;

@@ -2982,6 +2982,13 @@ export class DrizzleProjectRepository
           if (project.status === 'needs-attention' || project.currentRevisionId === null) {
             return false;
           }
+          /*
+           * Never re-flag an archived Project. Its status *is* `archived`, and overwriting that
+           * drops it out of the archived list and leaves restore refusing it as not-archived —
+           * a second dead end behind the first. The attention is still true and is derived again
+           * the moment it is restored.
+           */
+          if (project.archivedAt !== null) return false;
           const current = currentProjectProcessingAttempt(
             { id: project.currentRevisionId, revisionNumber: project.currentRevisionNumber },
             attemptsByProject.get(project.id) ?? [],

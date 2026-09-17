@@ -22,6 +22,7 @@ import {
   moveProjectToCampaign,
   type Project,
   type ProjectConflict,
+  type ProjectSnapshot,
 } from '@studio/domain';
 import { AppError } from '../../http/app-error.js';
 import { decodePageCursor, encodePageCursor } from '../../http/page-cursor.js';
@@ -42,6 +43,22 @@ const emptyFacts = {
   currentAttempt: { status: 'none' as const },
   validatedLastSuccessfulOutput: null,
 };
+
+/**
+ * The relational facts a snapshot can answer for itself, for the mutations that change a Project's
+ * metadata rather than its material.
+ *
+ * `currentAttempt` is deliberately `none`: the attempt lives in the processing repository, which
+ * this service does not hold, and a Project cannot be archived while one is active. The cost is
+ * that a Project archived with a failed attempt restores as `ready` rather than `needs-attention`
+ * until the recovery sweep re-flags it — the same trade the checkpoint below has always made, and
+ * they should stop making it together rather than one at a time.
+ */
+const snapshotFacts = (snapshot: ProjectSnapshot) => ({
+  sourceStatus: snapshot.sourceAssetId === null ? ('none' as const) : ('ready' as const),
+  currentAttempt: { status: 'none' as const },
+  validatedLastSuccessfulOutput: snapshot.lastSuccessfulOutput,
+});
 
 const sessionProposalMatches = (
   current: ProjectCurrentRead,
@@ -304,11 +321,7 @@ export class ProjectService {
           },
           author: { kind: 'user', authorId: ownerUserId },
           source: 'user-edit',
-          facts: {
-            sourceStatus: current.revision.snapshot.sourceAssetId === null ? 'none' : 'ready',
-            currentAttempt: { status: 'none' },
-            validatedLastSuccessfulOutput: current.revision.snapshot.lastSuccessfulOutput,
-          },
+          facts: snapshotFacts(current.revision.snapshot),
         },
         { now, createId: this.#createId },
       );
@@ -367,23 +380,17 @@ export class ProjectService {
     expectedVersion: number,
   ): Promise<ProjectServiceMutationResult> {
     return this.#metadataMutation(ownerUserId, projectId, expectedVersion, (current, now) => {
-      if (
-        current.revision.snapshot.sourceAssetId !== null ||
-        current.revision.snapshot.workingMedia !== null ||
-        current.revision.snapshot.presentedMedia !== null ||
-        current.revision.snapshot.lastSuccessfulOutput !== null
-      ) {
-        throw new AppError(
-          409,
-          'conflict',
-          'This Project needs current media facts before it can be restored.',
-        );
-      }
+      /*
+       * Derived, not refused. This used to throw a 409 whenever the snapshot carried media, because
+       * it handed the rule empty facts and would otherwise have derived a wrong status — which made
+       * archiving one-way for every Project that had ever held a video. The snapshot answers the
+       * two facts that matter, and every status they can produce is already a legal restore target.
+       */
       return restoreProject(
         current.project,
         expectedVersion,
         current.revision.snapshot,
-        emptyFacts,
+        snapshotFacts(current.revision.snapshot),
         now,
       );
     });

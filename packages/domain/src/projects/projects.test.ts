@@ -1371,6 +1371,14 @@ describe('Project aggregate rules', () => {
       later,
     );
     expect(restored).toMatchObject({ ok: true, value: { status: 'draft', archivedAt: null } });
+    /*
+     * Restoring derives the status from the facts it is given rather than assuming the Project is
+     * empty. The service used to refuse any Project carrying media rather than supply these, which
+     * made archiving one-way for every Project that had ever held a video.
+     */
+    expect(
+      restoreProject(archived.value, 3, { lastSuccessfulOutput: null }, readyFacts, later),
+    ).toMatchObject({ ok: true, value: { status: 'ready', archivedAt: null } });
     const deleted = deleteProject(archived.value, 3, 'permanent-delete', later);
     expect(deleted).toMatchObject({
       ok: true,

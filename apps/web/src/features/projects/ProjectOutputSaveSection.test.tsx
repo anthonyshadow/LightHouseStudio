@@ -385,7 +385,7 @@ describe('Project output save UI', () => {
             },
           },
         },
-      } as ProjectCurrentResponse,
+      },
     });
     expect(await screen.findByText(/This Project has an arrangement of 3 clips/u)).toBeVisible();
     // It informs and never blocks: saving the cut on the stage is a legitimate thing to want.

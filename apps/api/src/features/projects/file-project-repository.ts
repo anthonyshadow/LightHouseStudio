@@ -1160,7 +1160,9 @@ export class FileProjectRepository
           if (
             currentAttempt === null ||
             !projectProcessingNeedsAttention(currentAttempt.status) ||
-            aggregate.project.status === 'needs-attention'
+            aggregate.project.status === 'needs-attention' ||
+            // An archived Project keeps its status; see the sibling sweep for why.
+            aggregate.project.archivedAt !== null
           ) {
             return aggregate;
           }
