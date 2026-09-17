@@ -653,9 +653,11 @@ test('a mixed arrangement renders through the Project surface on the running API
     const totalMs = Number(await playhead.getAttribute('max'));
     expect(totalMs).toBeGreaterThan(portraitMs + 200);
     await expect(playhead).toHaveValue(String(portraitMs));
-    // The arrangement is autosaved through the Project session like any other change; the
-    // surface hides the Project route (and its autosave stamp) while it has the stage, so the
-    // server is asked directly whether the three clips arrived.
+    // The surface says it is saved, and the server is asked whether it agrees. The stamp is the
+    // operator's evidence; the snapshot is the product's.
+    await expect(page.locator('[data-composition-save-status]')).toContainText(/Autosaved ·/u, {
+      timeout: 30_000,
+    });
     await expect
       .poll(
         async () => {

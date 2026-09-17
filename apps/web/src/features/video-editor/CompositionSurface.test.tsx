@@ -139,7 +139,11 @@ const current = (
       currentRevisionId: 'e2b1a5c7-8d9e-4f01-a2b3-c4d5e6f70819',
       currentRevisionNumber: 3,
     },
-    revision: { snapshot: { composition: arrangement, presentedMedia } },
+    revision: {
+      revisionNumber: 3,
+      // The surface reads it for the save stamp; the contract always carries one.
+      snapshot: { composition: arrangement, presentedMedia, updatedAt: '2026-09-16T14:11:00.000Z' },
+    },
   }) as unknown as ProjectCurrentResponse;
 
 /**
@@ -147,7 +151,10 @@ const current = (
  * proposal and reads it back, so a gesture's effect is visible on the next render exactly as an
  * autosaved checkpoint would be.
  */
-const createSession = (arrangement: Composition | null) => {
+const createSession = (
+  arrangement: Composition | null,
+  phase: ProjectSessionPort['phase'] = 'saved',
+) => {
   let proposal: ProjectSessionProposalContract | null = null;
   const propose = vi.fn((patch: Partial<ProjectSessionProposalContract>) => {
     proposal = { ...(proposal ?? {}), ...patch } as ProjectSessionProposalContract;
@@ -155,18 +162,20 @@ const createSession = (arrangement: Composition | null) => {
     return true;
   });
   let rerender: (() => void) | undefined;
+  const retry = vi.fn(() => Promise.resolve(true));
+  const discard = vi.fn(() => true);
   const port = {
     projectId,
-    phase: 'saved' as const,
+    phase,
     get proposal() {
       return proposal;
     },
-    hasLocalProposal: false,
+    hasLocalProposal: true,
     message: null,
     propose,
     flush: () => Promise.resolve(true),
-    retry: () => Promise.resolve(true),
-    discard: () => true,
+    retry,
+    discard,
     getCurrent: () => current(arrangement),
     acceptCurrent: () => undefined,
     current: current(arrangement),
@@ -174,6 +183,8 @@ const createSession = (arrangement: Composition | null) => {
   return {
     port,
     propose,
+    retry,
+    discard,
     /** What the surface would read: `null` only when nothing is staged at all. */
     proposed: (): { readonly composition: Composition | null } | null =>
       proposal === null ? null : { composition: proposal.composition ?? null },
@@ -190,10 +201,11 @@ const renderSurface = (
     readonly archived?: boolean;
     readonly presentedMedia?: { kind: 'asset'; assetId: string } | null;
     readonly onRenderingChange?: (busy: boolean) => void;
+    readonly phase?: ProjectSessionPort['phase'];
   } = {},
 ) => {
   const presentedMedia = overrides.presentedMedia ?? null;
-  const session = createSession(arrangement);
+  const session = createSession(arrangement, overrides.phase);
   const onClose = vi.fn();
   const onRetryMedia = vi.fn();
   /*
@@ -528,6 +540,36 @@ describe('CompositionSurface', () => {
     expect(
       screen.getByText('This Project is archived. Restore it before arranging this video.'),
     ).toBeVisible();
+  });
+
+  it('says whether the arrangement is saved, where the masthead that normally says it is hidden', () => {
+    renderSurface();
+    expect(document.querySelector('[data-composition-save-status]')).toHaveTextContent(
+      /^Autosaved · /u,
+    );
+  });
+
+  it('reports a save that is still in flight, and one that failed, on this surface', () => {
+    const saving = renderSurface(composition(), { phase: 'saving' });
+    expect(document.querySelector('[data-composition-save-status]')).toHaveTextContent(
+      'Autosaving…',
+    );
+    saving.view.unmount();
+
+    renderSurface(composition(), { phase: 'error' });
+    expect(document.querySelector('[data-composition-save-status]')).toHaveTextContent(
+      'Not autosaved',
+    );
+  });
+
+  it('offers the conflict choice in place, rather than only when leaving', () => {
+    const { session } = renderSurface(composition(), { phase: 'conflict' });
+    const notice = screen.getByRole('alert');
+    expect(notice).toHaveTextContent('Conflict');
+    fireEvent.click(within(notice).getByRole('button', { name: 'Reapply changes' }));
+    expect(session.retry).toHaveBeenCalled();
+    fireEvent.click(within(notice).getByRole('button', { name: 'Discard local changes' }));
+    expect(session.discard).toHaveBeenCalled();
   });
 
   it('states that an archived Project is read-only and disables every way to change it', () => {

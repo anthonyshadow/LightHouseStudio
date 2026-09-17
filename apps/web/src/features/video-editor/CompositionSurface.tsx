@@ -19,6 +19,7 @@ import {
 } from 'react';
 import { Button, StatusNotice, VisuallyHidden } from '../../ui';
 import { AnnouncementRegion, useAnnouncement } from '../../ui/primitives/announcement';
+import { ProjectSessionNotice, projectWorkspaceSaveStatus } from '../projects/projectSaveStatus';
 import {
   clipMediaOf,
   type ProjectClipMedia,
@@ -253,6 +254,17 @@ export const CompositionSurface = ({
   );
   // A render reads the arrangement as it stands; no gesture may change it underneath.
   const blocked = archived || rendering;
+  /*
+   * The Project's own save state, said here because the masthead that normally carries it is hidden
+   * while this surface holds the stage. Until it was read here, the one surface that produces
+   * arrangement changes said nothing at all about whether they were saved — and the conflict choice
+   * below was reachable only by trying to navigate away.
+   */
+  const saveStatus = projectWorkspaceSaveStatus(
+    session,
+    false,
+    current.revision.snapshot.updatedAt,
+  );
 
   const selectedMedia = useMemo(
     () => (selectedClip === null ? null : clipMediaOf(media, selectedClip.clip.media)),
@@ -531,6 +543,19 @@ export const CompositionSurface = ({
           {`${placements.length} ${placements.length === 1 ? 'clip' : 'clips'} · ${formatVideoEditTimelineTime(durationMs)}`}
           {plan === null ? '' : ` · renders at ${frameLabel(plan)}`}
         </span>
+        <span
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          data-composition-save-status=""
+          data-tone={saveStatus.tone}
+        >
+          {saveStatus.dateTime ? (
+            <time dateTime={saveStatus.dateTime}>{saveStatus.label}</time>
+          ) : (
+            saveStatus.label
+          )}
+        </span>
         <Button variant="quiet" onClick={onClose}>
           Back to the Project
         </Button>
@@ -608,6 +633,7 @@ export const CompositionSurface = ({
           Render arrangement
         </Button>
       </div>
+      <ProjectSessionNotice session={session} sourceBusy={false} />
       {splitReason === null ? null : (
         <StatusNotice id={splitReason.id} role="status" tone="neutral" title={splitReason.title}>
           {splitReason.text}

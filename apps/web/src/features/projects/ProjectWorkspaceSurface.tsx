@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState, type KeyboardEvent } from 'r
 import { useLocation, useNavigate } from 'react-router';
 import { projectPath, projectWorkspacePath } from '../../app/paths';
 import { useRouteBack } from '../../app/useRouteBack';
-import { AppIcon, Button, StatusNotice } from '../../ui';
+import { AppIcon, Button } from '../../ui';
 import { ProjectCreateTaskPanel, type ProjectCreateRuntime } from './ProjectCreateTaskPanel';
 import type { ProjectRecordingLaunchRefusal } from './projectRecordingLaunch';
 import { ProjectRunOverlay, projectRunInFlight } from './ProjectRunOverlay';
@@ -13,7 +13,7 @@ import { projectProcessingBlockedReason } from './projectProcessingPresentation'
 import { ProjectHistorySection } from './ProjectHistorySection';
 import { ProjectOutputSaveSection } from './ProjectOutputSaveSection';
 import { saveTaskPanelStyles } from './ProjectOutputSaveSection.styles';
-import { dialogActionsStyles } from './ProjectRouteSurface.styles';
+import { ProjectSessionNotice, projectWorkspaceSaveStatus } from './projectSaveStatus';
 import { ProjectMediaSection, type ProjectMediaActivity } from './ProjectMediaSection';
 import { ProjectSourceSection, type ProjectRecordingCandidate } from './ProjectSourceSection';
 import { projectStatusLabel } from './projectStatusPresentation';
@@ -57,77 +57,6 @@ const projectWorkspaceTasks = PROJECT_WORKFLOW_STEPS.map((step) => ({
 
 export const isProjectWorkspaceTask = (value: string | null): value is ProjectWorkspaceTask =>
   value !== null && PROJECT_WORKFLOW_STEPS.some(({ id }) => id === value);
-
-const ProjectSessionNotice = ({
-  session,
-  sourceBusy,
-}: {
-  readonly session: ReturnType<typeof useProjectSession>;
-  readonly sourceBusy: boolean;
-}) => {
-  const theme = useTheme();
-  if (sourceBusy || session.current === null) return null;
-  const actions = session.hasLocalProposal ? (
-    <div css={dialogActionsStyles(theme)}>
-      <Button onClick={() => void session.retry()}>Reapply changes</Button>
-      <Button variant="danger" onClick={session.discard}>
-        Discard local changes
-      </Button>
-    </div>
-  ) : null;
-
-  switch (session.phase) {
-    case 'hydrating':
-      return null;
-    case 'dirty':
-    case 'saving':
-      return null;
-    case 'conflict':
-      return (
-        <StatusNotice role="alert" tone="warning" title="Conflict">
-          <p>
-            {session.message ??
-              'This Project changed somewhere else. Your unsaved changes are still here.'}
-          </p>
-          {actions}
-        </StatusNotice>
-      );
-    case 'error':
-      return (
-        <StatusNotice role="alert" tone="danger" title="Changes not saved">
-          <p>
-            {session.message ??
-              'Lightframe could not be reached. Your unsaved changes are still here.'}
-          </p>
-          {actions}
-        </StatusNotice>
-      );
-    case 'saved':
-      return null;
-  }
-};
-
-const projectWorkspaceSaveStatus = (
-  session: ReturnType<typeof useProjectSession>,
-  sourceBusy: boolean,
-  updatedAt: string,
-): {
-  readonly label: string;
-  readonly tone: 'neutral' | 'warning' | 'danger';
-  readonly dateTime?: string;
-} => {
-  if (sourceBusy || session.phase === 'saving') {
-    return { label: 'Autosaving…', tone: 'neutral' };
-  }
-  if (session.phase === 'dirty') return { label: 'Unsaved changes', tone: 'neutral' };
-  if (session.phase === 'hydrating') return { label: 'Checking save…', tone: 'neutral' };
-  if (session.phase === 'conflict') return { label: 'Conflict', tone: 'warning' };
-  if (session.phase === 'error') return { label: 'Not autosaved', tone: 'danger' };
-  const time = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' }).format(
-    new Date(updatedAt),
-  );
-  return { label: `Autosaved · ${time}`, tone: 'neutral', dateTime: updatedAt };
-};
 
 interface ProjectWorkspaceSurfaceProps {
   readonly current: ProjectCurrentResponse;

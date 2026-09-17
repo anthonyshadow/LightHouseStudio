@@ -155,10 +155,10 @@ the Project — the user continues editing and later saves supersede.
 conflicts (another tab) surface a reapply/discard choice; interrupted uploads resume; interrupted
 AI work reconciles on return; a crashed browser loses at most the unsaved in-memory take, and the
 UI says exactly what is at risk before any destructive step.
-_Today (2026-09-16, [verified](../audits/PHASE_4_COMPOSITION_VERIFICATION.md)): an arrangement
-autosaves and reopens correctly, but the stamp lives on the Project masthead, which the arrangement
-editor hides while it holds the stage — so on the one surface that builds an arrangement, the save
-state, the conflict choice and the save-failure path are all invisible._
+_Today (2026-09-16): an arrangement autosaves and reopens, and the arrangement editor carries its
+own copy of the save state and the conflict choice — the masthead that normally shows them is
+hidden while it holds the stage. The gate that
+[found that surface silent](../audits/PHASE_4_COMPOSITION_VERIFICATION.md) is closed._
 
 ## 14. Reopening work
 
