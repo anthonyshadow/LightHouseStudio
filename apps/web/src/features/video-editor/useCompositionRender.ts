@@ -84,17 +84,33 @@ export const useCompositionRender = () => {
         // the same, and the catch below is the one place that says so.
         controller.signal.throwIfAborted();
         setPhase('validating');
-        await validateEditedVideoOutput(
-          outcome.blob,
-          {
-            width: outcome.plan.video.target.width,
-            height: outcome.plan.video.target.height,
-            durationMs: outcome.plan.durationMs,
-            requireAudio: outcome.plan.audio !== null,
-            filename: PREVIEW_FILENAME,
-          },
-          controller.signal,
-        );
+        try {
+          await validateEditedVideoOutput(
+            outcome.blob,
+            {
+              width: outcome.plan.video.target.width,
+              height: outcome.plan.video.target.height,
+              durationMs: outcome.plan.durationMs,
+              requireAudio: outcome.plan.audio !== null,
+              filename: PREVIEW_FILENAME,
+            },
+            controller.signal,
+          );
+        } catch (invalid) {
+          if (controller.signal.aborted) throw invalid;
+          /*
+           * The validator is the intake's, and it speaks to someone who chose a file: "Choose a
+           * video that is 5 minutes or shorter", "Choose a video that is 300 MB or smaller". The
+           * operator chose no file — they arranged clips and pressed Render. Say what happened to
+           * the thing they did make, and keep the validator's sentence where it is useful.
+           */
+          throw new Error(
+            `This arrangement rendered, but the file it produced cannot be used: ${
+              invalid instanceof Error ? invalid.message : 'it failed the output check.'
+            }`,
+            { cause: invalid },
+          );
+        }
         controller.signal.throwIfAborted();
         setProgress(1);
         const next: CompositionRenderReady = {

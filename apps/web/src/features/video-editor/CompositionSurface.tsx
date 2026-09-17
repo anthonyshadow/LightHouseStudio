@@ -1,6 +1,7 @@
 import { useTheme } from '@emotion/react';
 import type { ProjectCurrentResponse } from '@studio/contracts';
 import {
+  VIDEO_DURATION_LIMIT_MS,
   VIDEO_EDIT_AUDIO_LEVEL_MAX,
   VIDEO_EDIT_MINIMUM_TRIM_MS,
   clipMediaMsAt,
@@ -96,6 +97,17 @@ const ADD_REFUSED_NOTICE = 'That video could not be added. Your arrangement is u
 
 const RENDER_UNSUPPORTED_NOTICE =
   'This browser cannot render this arrangement without blocking the Studio. Your clips are unchanged, and you can keep arranging.';
+
+/**
+ * Why an arrangement is too long to render, in its own words.
+ *
+ * The file is validated against the intake's duration ceiling, and until this existed that refusal
+ * arrived *after* the encode was paid for, in the intake's voice: "Choose a video that is 5 minutes
+ * or shorter", said to someone who chose no video. Reachable in two gestures — intake caps a source
+ * at five minutes rather than at less, and Add a clip appends the whole of one.
+ */
+const overLongRenderNotice = (durationMs: number): string =>
+  `This arrangement runs to ${formatVideoEditTimelineTime(durationMs)}. A rendered arrangement can be at most 5 minutes. Trim or remove a clip to bring it under.`;
 
 const unresolvedRenderNotice = (count: number): string =>
   count === 1
@@ -458,13 +470,18 @@ export const CompositionSurface = ({
    * with no sentence beside it is a dead end. `null` from the probe is still asking, and says
    * nothing — the same treatment the editor gives it.
    */
+  // Measured on the trimmed sequence, which is what the render produces and what the validator
+  // will measure back.
+  const overLong = durationMs > VIDEO_DURATION_LIMIT_MS;
   const renderRefusal =
     supported === false
       ? { title: 'Local render unavailable', text: RENDER_UNSUPPORTED_NOTICE }
       : unresolved > 0
         ? { title: 'Media unavailable', text: unresolvedRenderNotice(unresolved) }
-        : null;
-  const canRender = supported === true && unresolved === 0 && !rendering;
+        : overLong
+          ? { title: 'Too long to render', text: overLongRenderNotice(durationMs) }
+          : null;
+  const canRender = supported === true && unresolved === 0 && !overLong && !rendering;
   // A plan describes the arrangement it was made from; after a gesture its per-clip facts would
   // be read against clips that have moved, so they are shown only while the two still agree.
   const plan = stale ? null : render.plan;

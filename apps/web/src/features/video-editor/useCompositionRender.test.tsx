@@ -252,6 +252,11 @@ describe('useCompositionRender', () => {
       await pending;
     });
     expect(hook.result.current.phase).toBe('error');
+    // The validator's sentence is kept, inside one that says what the operator actually did: they
+    // arranged clips and pressed Render, and the intake's "choose another video" means nothing here.
+    expect(hook.result.current.error).toMatch(
+      /^This arrangement rendered, but the file it produced/u,
+    );
     expect(hook.result.current.error).toMatch(/dimensions did not match/u);
   });
 

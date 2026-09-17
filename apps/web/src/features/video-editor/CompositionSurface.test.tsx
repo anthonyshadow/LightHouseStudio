@@ -615,6 +615,33 @@ describe('CompositionSurface', () => {
     expect(within(screen.getByRole('listbox')).getAllByRole('option')).toHaveLength(1);
   });
 
+  it('refuses to render an arrangement past the five-minute ceiling, before paying for it', () => {
+    /*
+     * Reachable in two gestures: a source is capped at five minutes, not less, and Add a clip
+     * appends the whole of one. This used to render in full and then refuse with the intake's
+     * words about choosing a shorter video.
+     */
+    const long: Composition = {
+      ...composition(),
+      clips: [
+        { ...composition().clips[0]!, trim: { startMs: 0, endMs: 200_000 } },
+        { ...composition().clips[1]!, trim: { startMs: 0, endMs: 150_000 } },
+      ],
+    };
+    renderSurface(long);
+    expect(renderControl()).toBeDisabled();
+    expect(renderControl()).toHaveAttribute('aria-describedby', 'composition-render-reason');
+    expect(screen.getByText(/This arrangement runs to 05:50\.00/u)).toBeVisible();
+    expect(mocks.renderComposition).not.toHaveBeenCalled();
+
+    // Trimmed back under the ceiling, the same control is live again.
+    fireEvent.click(clipOptions()[0]!);
+    fireEvent.change(screen.getByRole('slider', { name: 'Clip ends at' }), {
+      target: { value: '100000' },
+    });
+    expect(renderControl()).toBeEnabled();
+  });
+
   it('offers the render once the browser has answered, and says why when it cannot render', () => {
     mocks.support = null;
     const first = renderSurface();
