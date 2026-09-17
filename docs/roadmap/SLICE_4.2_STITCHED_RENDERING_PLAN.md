@@ -467,9 +467,14 @@ Of the low findings, fixed: the double `output.cancel()` on a cancel, a decoded 
 when a write threw, the probe's acceleration option, the retry-policy comment's overclaim,
 plan-derived notices shown against a changed arrangement, and an unused exported type. Recorded
 rather than fixed: the validator applies the intake's five-minute duration limit to the preview,
-so an arrangement longer than that renders fully and is then refused with the intake's copy — no
-arrangement can reach that length today, and the honest fix is a refusal before paid work in 4.3,
-where the save is decided.
+so an arrangement longer than that renders fully and is then refused with the intake's copy, and
+the honest fix is a refusal before paid work.
+
+**Corrected 2026-09-16.** The sentence above used to end "no arrangement can reach that length
+today". That was wrong, and the prompt-35 audit traced why: intake caps each source at five
+minutes rather than at less, **Add a clip** appends the whole of a video, and the picker offers a
+video the arrangement already holds. One five-minute source and one press of **Add a clip** is a
+ten-minute arrangement. The refusal is reachable in two gestures, not unreachable.
 
 ### 8.5 Deliberately not done
 

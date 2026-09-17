@@ -197,7 +197,9 @@ Not fixed here, per the prompt. Ordered by how much of the vision each one block
    the surface offers a gesture that cannot land); an archived Project that was never arranged
    shows a disabled **Arrange this video** with no stated reason; a preview longer than five
    minutes is rendered in full and then refused with the intake's copy about choosing a shorter
-   video; a staged proposal that un-arranges a Project is not reflected until it is written; and a
+   video — reachable in two gestures, not theoretical: intake caps each source at five minutes,
+   **Add a clip** appends the whole of a video, and the picker offers one the arrangement already
+   holds, so one five-minute source plus one add is a ten-minute arrangement; a staged proposal that un-arranges a Project is not reflected until it is written; and a
    duplicated Project shows the Media area's heading with no list and no empty state beneath it.
 
 ## What this record does not claim
