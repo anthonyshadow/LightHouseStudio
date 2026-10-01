@@ -16,7 +16,7 @@
     "@studio/contracts": "workspace:*",
     "@studio/domain": "workspace:*",
     "@tanstack/react-query": "5.102.8",
-    "@uppy/aws-s3": "5.1.0",
+    "@uppy/aws-s3": "6.2.0",
     "@uppy/core": "5.2.0",
     "idb": "8.0.3",
     "mediabunny": "1.55.5",
