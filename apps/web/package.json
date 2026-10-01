@@ -10,26 +10,26 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@decartai/sdk": "0.1.22",
+    "@decartai/sdk": "0.2.3",
     "@emotion/react": "11.14.0",
-    "@mediabunny/aac-encoder": "1.55.5",
+    "@mediabunny/aac-encoder": "1.60.0",
     "@studio/contracts": "workspace:*",
     "@studio/domain": "workspace:*",
-    "@tanstack/react-query": "5.102.8",
+    "@tanstack/react-query": "5.104.0",
     "@uppy/aws-s3": "5.1.0",
     "@uppy/core": "5.2.0",
     "idb": "8.0.3",
-    "mediabunny": "1.55.5",
-    "react": "19.2.8",
-    "react-dom": "19.2.8",
-    "react-router": "8.3.1"
+    "mediabunny": "1.60.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "react-router": "8.4.0"
   },
   "devDependencies": {
-    "@babel/core": "8.0.1",
-    "@rolldown/plugin-babel": "0.2.3",
+    "@babel/core": "8.0.6",
+    "@rolldown/plugin-babel": "0.2.4",
     "@vitejs/plugin-react": "6.1.1",
     "babel-plugin-react-compiler": "1.0.0",
     "fake-indexeddb": "6.2.5",
-    "vite": "8.2.2"
+    "vite": "8.3.1"
   }
 }
